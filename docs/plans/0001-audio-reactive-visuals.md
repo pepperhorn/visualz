@@ -69,7 +69,7 @@ T1 lands first and fixes the seams: schemas, the GL helpers, and stub modules wi
 - **Owns:** `deploy/**`, `docs/guides/pi-setup.md`
 - **Acceptance:** AC17; Wi-Fi client setup for a named network at install time; hardware notes (USB audio interfaces, multichannel mixers over USB, webcams, HDMI mode, Pi 2 Wi-Fi adapter)
 - **Verify:** `shellcheck deploy/*.sh` plus the whole-item command
-- **Notes / gotchas:** Raspberry Pi OS Lite Bookworm 32-bit. Install runtime dependencies with apt, not pip. systemd unit with `Restart=always`, running as a non-root user in the `video`, `render`, `audio`, and `input` groups. Set the HDMI mode to 720p and enough GPU memory. Cannot be fully verified without hardware: the return handoff must say what was and wasn't tested.
+- **Notes / gotchas:** Raspberry Pi OS Lite Bookworm 32-bit. Install runtime dependencies with apt, not pip. systemd unit with `Restart=always`, running as a non-root user in the `video`, `render`, `audio`, and `input` groups. Set the HDMI mode to 720p and enough GPU memory. Keep Raspberry-Pi-specific steps (boot config, GPU memory) in clearly separated functions so a second board (Orange Pi Zero 2W on Armbian) can be added later without rewriting the script. Cannot be fully verified without hardware: the return handoff must say what was and wasn't tested.
 
 ## Merge order
 T1 → human runs `tools/smoke.py` on the Pi → (T2, T3, T4, T5 in parallel, any order) → lead runs the whole-item verification on main → human runs the hardware criteria.
