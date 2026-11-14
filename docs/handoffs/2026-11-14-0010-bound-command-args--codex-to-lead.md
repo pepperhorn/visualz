@@ -8,7 +8,7 @@
 - **Worktree:** /home/t3box/.t3/worktrees/visualz/t3-a3b90767-d9bddebb355b5d35
 - **PR:** https://github.com/pepperhorn/visualz/pull/6 (draft)
 - **Base commit:** 7e90fe1 (starting checkout; includes the dispatch)
-- **Implementation commit:** b47470e74990f80e1c08713676bb099ba5891ee5
+- **Implementation commits:** b47470e74990f80e1c08713676bb099ba5891ee5; review fixes bc0da597d6dca8d0c7bf804f25f874daf2ee7be4
 - **Port:** 5300 (no server left running)
 - **Status:** closed
 
@@ -49,12 +49,23 @@ None.
 - **Verification output:**
   ```text
   All checks passed!
-  ======================= 123 passed, 3 skipped in 11.27s ========================
-  126 passed, 1 warning in 12.72s
+  ======================= 131 passed, 3 skipped in 11.29s ========================
+  134 passed, 1 warning in 12.76s
   git diff --check: clean
   ```
   The xvfb warning is pygame's existing pkg_resources deprecation. Without xvfb, three display-dependent tests skip.
-- **Decisions made:** the command endpoint alone gets a 64 KiB body cap, separate from the shared 4096-element aggregate budget. The limited request is cloned at the start of the error middleware so the handler and queue-full error reply share its cached JSON and preserve the client id. WS retains its existing 1 MiB message cap and rejects oversized args through the shared enqueue path. Image metadata includes the generated content_type/bytes fields in its final aggregate budget; the raw metadata is checked before constructing the merged mapping. Custom sizing failures are normalized to ValueError without weakening tolerant send-time coercion. The prior oversized-args/result drain regression now uses small args that produce an oversized result, preserving coverage of bounded command status and subsequent callbacks under the new argument contract.
+- **Decisions made:** the command endpoint alone gets a 64 KiB body cap, separate from the shared 4096-element aggregate budget. The limited request is cloned at the start of the error middleware so the handler and queue-full error reply share its cached JSON and preserve the client id. WS command frames now share the HTTP 64 KiB cap (measured in UTF-8 bytes); other message types retain the existing 1 MiB cap. Oversized args are also rejected through the shared enqueue path. Image metadata includes the generated content_type/bytes fields in its final aggregate budget; the merged metadata mapping is checked once before conversion, with no duplicate size traversal. Custom sizing failures are normalized to ValueError without weakening tolerant send-time coercion. The prior oversized-args/result drain regression now uses small args that produce an oversized result, preserving coverage of bounded command status and subsequent callbacks under the new argument contract.
 - **Out-of-scope issues found:** none.
 - **Follow-ups:** lead to arrange cross-family review and decide merge; no further implementation work outstanding.
 - **For GBrain (lead to promote):** aiohttp cloned requests share the stream but have separate JSON/body caches; apply an endpoint-specific clone before middleware that rereads a body for an error response.
+
+
+## Review fixes (2026-11-14)
+Addressed [review 5907857475](https://github.com/pepperhorn/visualz/pull/6#pullrequestreview-5907857475) under the lead's explicit decisions:
+
+- Shared `MAX_JSON_DEPTH = 32` in `json_safe.py`, enforced by an iterative (non-recursive) aggregate size/depth walk before command deepcopy or publisher conversion. NumPy dimensionality counts toward depth. Ancestor tracking still handles cycles and counts repeated references in separate branches.
+- HTTP JSON parser RecursionError becomes a readable 400; WS catches it and returns an error while preserving the connection. The id is echoed after successful parsing (500-level test); it is null when the decoder cannot produce an envelope (2000-level test).
+- Command-only WS cap measures encoded UTF-8 bytes against `MAX_COMMAND_BODY`. Tests reject both 900 KB ASCII and 40,000 non-ASCII characters, echo the id, prove nothing queued, and successfully apply a similarly large patch on the same socket.
+- Deep command tests construct raw JSON to avoid the client's encoder limits. Both 500- and 2000-deep payloads are rejected over HTTP and WS, then a following WS command succeeds. 500-deep status/image tests verify ValueError and unchanged prior publications. A boundary test covers exactly the allowed depth and cycles.
+- Replaced the new image metadata test's 5 ms wall-clock assertion with a NumPy-like conversion sentinel whose `tolist()` fails if called. Removed the redundant raw-metadata size walk; the merged mapping is checked/coerced once outside the lock, including generated content_type/bytes fields.
+- Only the originally owned files and this return handoff changed. Full verification above rerun on the review fix. No open questions or outstanding implementation fixes; ready for cross-family re-review.
