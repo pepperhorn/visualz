@@ -26,6 +26,7 @@ Next ID: 0003
 | S | Kind | Suggestion | Evidence | Effort (S/M/L) | Value | Source | Status |
 |---|---|---|---|---|---|---|---|
 | S1 | next step | Drive visuals from individual XR18 channels (e.g. kick channel meter as the beat trigger, vocal level for the overlay) using the mixer link from 0002, instead of detecting beats from the stereo mix | Spec 0002 already subscribes to per-channel meters; spec 0001 beat detection works on a full mix, which is less reliable than a kick channel | M | high: tighter sync with the music | lead, 2026-11-14 | new |
+| S2 | stack | Try the Orange Pi Zero 2W as a second board: run `tools/smoke.py` on it once 0001 T1 merges; if GPU acceleration and HDMI work, add it to the install script and raise the default internal resolution for it | Spec 0001 Constraints (secondary, unverified target); H618 + Mali-G31 is faster than the Pi 2/3 GPU, but HDMI on current images is unconfirmed (Armbian forum threads 32944, 36896) | S to test, M to support | medium: more headroom and built-in Wi-Fi | human, 2026-11-14 | new: waiting on smoke test by the human |
 
 Last health scan: never
 
