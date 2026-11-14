@@ -24,7 +24,7 @@ One Python 3 program runs on Raspberry Pi OS Lite with no desktop:
 ## Consequences
 - Shaders are restricted to GLSL ES 1.00 and must be short: constant loop bounds, few texture reads, no derivatives extension assumed.
 - The overlay is not HTML: layout features are what we build (text blocks, boxes, outline/shadow, images, frame loops). Rich text and CSS effects are out.
-- Logo videos become frame loops with a length and size cap, held in a texture atlas.
+- Logo videos become frame loops with a length and size cap, stored as separate frame files with a manifest and loaded as individual textures. Frame size and rate depend on the hardware profile.
 - The same program runs on a Linux laptop in a window for development, using the same ES 2.0 context.
 - pygame on KMS/DRM with ES 2.0 is the main unproven piece on this hardware. T1 ships a hardware smoke test the human runs on the real Pi before the parallel tasks are dispatched.
 - Stage and control server share one process: a crash takes both down, so the service restarts automatically.

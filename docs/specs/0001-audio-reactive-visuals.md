@@ -100,6 +100,7 @@ The overlay is described by a JSON **overlay template**. A template contains:
 
 Behaviour:
 - Templates are files (`data/overlays/<id>.json`), validated against a published schema. They can be edited in the UI or by hand, exported, and imported.
+- A hand-edited file that fails validation is never deleted or overwritten: it is set aside next to the original with its error, the last valid version stays in use, and the control UI lists the problem so it can be fixed.
 - The control UI shows templates as an ordered list of slides with a preview. Tap one to take it live. Next / previous buttons and a "clear overlay" button are always visible.
 - Text can use `{{variables}}` (e.g. `{{band}}`, `{{song}}`) filled from a small live "now playing" form, so one lower-third template serves every song.
 - **Fonts**: a bundled set of open-licence fonts (including at least two pixel fonts and two bold display fonts, and Poppins in several weights, required by the human; the proposed full list is in `docs/mockups/index.html`) plus uploaded font files (TTF/OTF). Any font is selectable per text block.
