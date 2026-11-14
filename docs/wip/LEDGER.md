@@ -5,7 +5,7 @@
 > Waiting on: `child <taskId>` · `review <taskId>` · `ci` · `human: <why>` · `lead: <next action>`. Set it on every status change. A row needs the lead when it starts with `lead`, or when it's empty and Status is dispatched, in-review, changes-requested, ready, or merged. The lead's Stop hook won't let the lead end its turn while any row needs it.
 > Type: normal items have a spec and plan. Quick items have the title prefix `[quick]` (no spec or plan, a short handoff). PRs adopted by `orch-sweep` have the prefix `[pr]`.
 
-Next ID: 0003
+Next ID: 0004
 
 ## Active
 
@@ -13,6 +13,7 @@ Next ID: 0003
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 0001 | Audio-reactive visuals for live shows (v1) | dispatched | child node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1 | T1: codex/gpt-6.1-sol | T1: orch/0001-t1-scaffold | — | — | T1 task `node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1` · thread `thread:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1` | [spec](../specs/0001-audio-reactive-visuals.md) | [plan](../plans/0001-audio-reactive-visuals.md) | [T1 dispatch](../handoffs/2026-11-14-0001-t1-scaffold--lead-to-codex.md) | 2026-11-14 |
 | 0002 | XR18 web mixer and personal monitor mixes | planned | human: approve spec 0002 (no open questions left); build starts after 0001 T1 and T4 | — | — | — | — | — | [spec](../specs/0002-xr18-web-mixer.md) | [plan](../plans/0002-xr18-web-mixer.md) | — | 2026-11-14 |
+| 0003 | Stereo and multitrack recording to a USB drive | planned | human: approve spec 0003 and answer its 2 open questions; build starts after 0001 T1, T2, T4, T5 | — | — | — | — | — | [spec](../specs/0003-usb-recording.md) | [plan](../plans/0003-usb-recording.md) | — | 2026-11-14 |
 
 ## Done / closed
 
@@ -32,6 +33,7 @@ Last health scan: never
 
 ## Log
 <!-- One line per status change, newest first: YYYY-MM-DD NNNN old→new — note -->
+2026-11-14 0003 —→planned — spec and plan drafted at the human's request; 0001 plan T2 now opens audio by configurable ALSA name for shared capture
 2026-11-14 0001 dispatched — T1 delegated to codex/gpt-6.1-sol (0001-t1-impl-r1)
 2026-11-14 0001 planned→dispatched — spec approved by the human; T1 handoff written; T2–T5 wait on T1 merge and the Pi smoke test. GBrain: pending write-back (unavailable)
 2026-11-14 0002 planned→planned — all open questions answered: wedges and in-ears, engineer PIN on by default (0000)
