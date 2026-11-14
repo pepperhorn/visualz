@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "visualz"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "aiohttp>=3.8", # apt: python3-aiohttp
+  "jsonschema>=4.10", # apt: python3-jsonschema
+  "Pillow>=9.4", # apt: python3-pil; SVG rasterisation: ffmpeg (system executable)
+  "numpy>=1.24", # apt: python3-numpy
+  "pygame>=2.1", # apt: python3-pygame, libsdl2-2.0-0
+  "PyOpenGL>=3.1", # apt: python3-opengl; libgles2, libegl1
+  "pyalsaaudio>=0.8", # apt: python3-alsaaudio (T2 capture)
+]
+# On pip-based Linux development, pyalsaaudio needs gcc and libasound2-dev.
+# Media conversion / camera enumeration: apt ffmpeg, v4l-utils
+[project.optional-dependencies]
+dev = ["ruff", "pytest", "pytest-asyncio"]
+[project.scripts]
+visualz = "visualz.__main__:main"
+[tool.setuptools.packages.find]
+include = ["visualz*"]
+[tool.setuptools.package-data]
+"visualz.schema" = ["*.json"]
+[tool.setuptools.data-files]
+"share/visualz/web" = ["web/index.html"]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]

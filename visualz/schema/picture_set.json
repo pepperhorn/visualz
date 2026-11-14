@@ -1,0 +1,155 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "asset": {
+            "type": "string",
+            "pattern": "^assets/[a-zA-Z0-9_][a-zA-Z0-9_.-]*(?:/[a-zA-Z0-9_][a-zA-Z0-9_.-]*)*$",
+            "maxLength": 240
+          },
+          "type": {
+            "enum": [
+              "picture",
+              "clip",
+              "camera"
+            ]
+          },
+          "playback": {
+            "enum": [
+              "loop",
+              "ping-pong",
+              "beat-jump"
+            ]
+          },
+          "audio_speed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "asset",
+          "type"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 500
+    },
+    "order": {
+      "enum": [
+        "sequential",
+        "shuffle"
+      ]
+    },
+    "fit": {
+      "enum": [
+        "fill",
+        "blurred-fill"
+      ]
+    },
+    "transition": {
+      "enum": [
+        "random",
+        "flow-warp",
+        "pixel-sort",
+        "kaleidoscope",
+        "luminance-dissolve",
+        "feedback-bloom"
+      ]
+    },
+    "trigger": {
+      "enum": [
+        "seconds",
+        "beats",
+        "manual"
+      ]
+    },
+    "interval": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 3600
+    },
+    "amount": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "camera": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "device": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "interval": {
+          "type": "number",
+          "minimum": 5,
+          "maximum": 3600
+        },
+        "keep_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "save": {
+          "type": "boolean"
+        },
+        "mirror": {
+          "type": "boolean"
+        },
+        "rotation": {
+          "enum": [
+            0,
+            90,
+            180,
+            270
+          ]
+        },
+        "brightness": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "enabled",
+        "device",
+        "interval",
+        "keep_count",
+        "save",
+        "mirror",
+        "rotation",
+        "brightness"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "items",
+    "order",
+    "fit",
+    "transition",
+    "trigger",
+    "interval",
+    "amount",
+    "camera"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

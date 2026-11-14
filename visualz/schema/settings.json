@@ -1,0 +1,387 @@
+{
+  "type": "object",
+  "properties": {
+    "audio": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "left_channel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "right_channel": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "gain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "sensitivity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "smoothing": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "required": [
+        "device",
+        "left_channel",
+        "right_channel",
+        "gain",
+        "sensitivity",
+        "smoothing"
+      ],
+      "additionalProperties": false
+    },
+    "mode": {
+      "enum": [
+        "pixel-eye",
+        "kaleido",
+        "prism",
+        "liquid",
+        "opart",
+        "plasma",
+        "chromascope",
+        "gallery"
+      ]
+    },
+    "mode_params": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "number",
+          "string",
+          "boolean",
+          "null"
+        ]
+      }
+    },
+    "quality": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "look": {
+      "type": "object",
+      "properties": {
+        "style": {
+          "enum": [
+            "none",
+            "pixel",
+            "halftone"
+          ]
+        },
+        "pixel_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "colour_depth": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 4,
+              "maximum": 256
+            },
+            {
+              "const": "full"
+            }
+          ]
+        },
+        "dither": {
+          "type": "boolean"
+        },
+        "palette": {
+          "type": "string"
+        },
+        "brightness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "contrast": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "saturation": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "speed": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "reactivity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "halftone": {
+          "type": "object",
+          "properties": {
+            "dot_size": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 64
+            },
+            "angle": {
+              "type": "number",
+              "minimum": -360,
+              "maximum": 360
+            },
+            "shape": {
+              "enum": [
+                "dot",
+                "line",
+                "diamond"
+              ]
+            },
+            "style": {
+              "enum": [
+                "mono",
+                "duotone",
+                "cmyk"
+              ]
+            },
+            "ink": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+            },
+            "paper": {
+              "type": "string",
+              "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+            },
+            "audio_pulse": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 2
+            }
+          },
+          "required": [
+            "dot_size",
+            "angle",
+            "shape",
+            "style",
+            "ink",
+            "paper",
+            "audio_pulse"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "style",
+        "pixel_size",
+        "colour_depth",
+        "dither",
+        "palette",
+        "brightness",
+        "contrast",
+        "saturation",
+        "speed",
+        "reactivity",
+        "halftone"
+      ],
+      "additionalProperties": false
+    },
+    "palettes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+        },
+        "minItems": 4,
+        "maxItems": 256
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+        },
+        "background": {
+          "type": "string",
+          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+        }
+      },
+      "required": [
+        "primary",
+        "accent",
+        "text",
+        "background"
+      ],
+      "additionalProperties": false
+    },
+    "fade_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 30
+    },
+    "auto_cycle": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "pixel-eye",
+              "kaleido",
+              "prism",
+              "liquid",
+              "opart",
+              "plasma",
+              "chromascope",
+              "gallery"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "trigger": {
+          "enum": [
+            "seconds",
+            "beats"
+          ]
+        },
+        "interval": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3600
+        },
+        "shuffle": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "modes",
+        "trigger",
+        "interval",
+        "shuffle"
+      ],
+      "additionalProperties": false
+    },
+    "stage": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1920
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1080
+        },
+        "render_width": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 1280
+        },
+        "render_height": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 720
+        }
+      },
+      "required": [
+        "width",
+        "height",
+        "render_width",
+        "render_height"
+      ],
+      "additionalProperties": false
+    },
+    "source_asset": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^assets/[a-zA-Z0-9_][a-zA-Z0-9_.-]*(?:/[a-zA-Z0-9_][a-zA-Z0-9_.-]*)*$",
+          "maxLength": 240
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "picture_set": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "blackout": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "overlay": {
+          "type": "boolean"
+        },
+        "fade_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "enabled",
+        "overlay",
+        "fade_seconds"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "audio",
+    "mode",
+    "mode_params",
+    "quality",
+    "look",
+    "palettes",
+    "theme",
+    "fade_seconds",
+    "auto_cycle",
+    "stage",
+    "source_asset",
+    "picture_set",
+    "blackout"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

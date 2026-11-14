@@ -1,0 +1,166 @@
+{
+  "settings": {
+    "audio": {
+      "device": null,
+      "left_channel": 0,
+      "right_channel": 1,
+      "gain": 1,
+      "sensitivity": 1,
+      "smoothing": 0.7
+    },
+    "mode": "plasma",
+    "mode_params": {},
+    "quality": "medium",
+    "look": {
+      "style": "pixel",
+      "pixel_size": 3,
+      "colour_depth": 16,
+      "dither": true,
+      "palette": "neon",
+      "brightness": 1,
+      "contrast": 1,
+      "saturation": 1,
+      "speed": 1,
+      "reactivity": 1,
+      "halftone": {
+        "dot_size": 6,
+        "angle": 15,
+        "shape": "dot",
+        "style": "duotone",
+        "ink": "@primary",
+        "paper": "@background",
+        "audio_pulse": 0
+      }
+    },
+    "palettes": {
+      "neon": [
+        "#16081f",
+        "#e0245e",
+        "#ffe14a",
+        "#35d6c5"
+      ],
+      "sunset": [
+        "#16081f",
+        "#e0245e",
+        "#ff6a3d",
+        "#ffe14a"
+      ],
+      "ice": [
+        "#001122",
+        "#005577",
+        "#35d6c5",
+        "#ffffff"
+      ]
+    },
+    "theme": {
+      "primary": "#ffe14a",
+      "accent": "#e0245e",
+      "text": "#ffffff",
+      "background": "#16081f"
+    },
+    "fade_seconds": 1,
+    "auto_cycle": {
+      "enabled": false,
+      "modes": [
+        "plasma",
+        "kaleido"
+      ],
+      "trigger": "seconds",
+      "interval": 30,
+      "shuffle": false
+    },
+    "stage": {
+      "width": 1280,
+      "height": 720,
+      "render_width": 480,
+      "render_height": 270
+    },
+    "source_asset": null,
+    "picture_set": null,
+    "blackout": {
+      "enabled": false,
+      "overlay": false,
+      "fade_seconds": 0.5
+    }
+  },
+  "scenes": {},
+  "overlays": {
+    "logo-bug": {
+      "id": "logo-bug",
+      "name": "Logo bug",
+      "order": 0,
+      "logo": null,
+      "texts": [],
+      "animation": {
+        "enter": "fade",
+        "leave": "fade",
+        "duration": 0.4,
+        "show_seconds": 10,
+        "repeat_minutes": 0
+      },
+      "variables": {}
+    },
+    "lower-third": {
+      "id": "lower-third",
+      "name": "Lower third",
+      "order": 1,
+      "logo": null,
+      "texts": [
+        {
+          "text": "{{band}}",
+          "position": "lower-third",
+          "font": "Poppins",
+          "size": 48,
+          "colour": "@text"
+        },
+        {
+          "text": "{{song}}",
+          "position": "bottom-left",
+          "font": "Poppins",
+          "size": 48,
+          "colour": "@text"
+        }
+      ],
+      "animation": {
+        "enter": "fade",
+        "leave": "fade",
+        "duration": 0.4,
+        "show_seconds": 10,
+        "repeat_minutes": 0
+      },
+      "variables": {}
+    },
+    "title-card": {
+      "id": "title-card",
+      "name": "Title card",
+      "order": 2,
+      "logo": null,
+      "texts": [
+        {
+          "text": "{{band}}",
+          "position": "centre",
+          "font": "Poppins",
+          "size": 48,
+          "colour": "@text"
+        }
+      ],
+      "animation": {
+        "enter": "fade",
+        "leave": "fade",
+        "duration": 0.4,
+        "show_seconds": 10,
+        "repeat_minutes": 0
+      },
+      "variables": {}
+    }
+  },
+  "picture_sets": {},
+  "assets": {},
+  "now_playing": {
+    "band": "The Band",
+    "song": "",
+    "extra": ""
+  },
+  "active_scene": null,
+  "active_overlay": null
+}
