@@ -5,7 +5,7 @@
 - **Ledger:** 0007 · **Spec:** [0001](../specs/0001-audio-reactive-visuals.md) · **Plan:** — (quick item)
 - **Branch:** orch/0007-status-coercion-bounds
 - **Worktree:** /home/t3box/.t3/worktrees/visualz/t3-41a2c306-ab370d26783ea5dc
-- **PR:** draft PR to be created from this branch after committing this handoff.
+- **PR:** https://github.com/pepperhorn/visualz/pull/5 (draft)
 - **Base commit:** 108ff559be065b8e77b3da644569fd3465f44c17
 - **Implementation commit:** eb65a1aa25e5c470b92f370dcc62b31eaa2b12f6
 - **Port:** 5270 (no server started)
