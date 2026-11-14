@@ -24,7 +24,7 @@ The Pi is already connected to the XR18 by USB and receives all of the mixer's c
 
 ### Modes
 - **Stereo**: two chosen USB channels (for example the main mix) into one stereo file. Format WAV 24-bit, or FLAC to save space.
-- **Multitrack**: any chosen set of USB channels, each written as its own mono WAV file, 24-bit, at the mixer's sample rate (48 kHz, or 44.1 kHz if the mixer is set to it). Up to all 18 channels.
+- **Multitrack**: any chosen set of USB channels, each written as its own mono WAV file, 24-bit, at the mixer's sample rate (48 kHz, or 44.1 kHz if the mixer is set to it). Up to every channel the device offers: 18 on the XR18. The recorder takes the channel count from the device, so a larger interface (for example an X32's 32-channel USB card) needs no code change, only enough hardware: see Constraints.
 - Both at once is allowed: a stereo file plus the separate tracks, in the same take folder.
 
 ### Tracks
@@ -54,6 +54,7 @@ The Pi is already connected to the XR18 by USB and receives all of the mixer's c
 - The XR18's USB capture is shared between the visuals and the recorder through ALSA's capture-sharing layer (`dsnoop`), configured by the install script, so both can read the device at once. The visuals read their two channels from the shared device, never the raw one.
 - Recorder priority is above the visuals: under load, the visuals drop frames before the recorder drops audio.
 - Pi 2/3 have a single USB 2.0 bus shared by the mixer, the drive, a webcam, and (Pi 2) a Wi-Fi adapter. Eighteen tracks at 24-bit is about 2.6 MB per second, roughly 9.3 GB per hour. This is within the bus's capacity but leaves less margin with a webcam attached; AC10 measures it.
+- Thirty-two tracks (an X32) is about 4.6 MB per second, roughly 16.6 GB per hour, and close to the limit of a Pi 2/3's single USB 2.0 bus once the drive is on the same bus. It is expected to need the NUC-class machine; on a Pi 2/3 the page warns when the armed track count exceeds what the drive speed check supports.
 - Disk writes go through a memory buffer of several seconds so a slow moment on the drive does not cause a dropout.
 - Follows ADR 0002 conventions: Python, apt-installable dependencies, static web pages, the same UI shell as 0001.
 - Trusted local network. Record and stop are available to anyone who can open the UI; eject and "always record" sit behind the engineer PIN from 0002 when that service is installed.

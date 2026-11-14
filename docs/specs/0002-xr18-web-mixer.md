@@ -20,7 +20,7 @@ Options considered and declined by the human on 2026-11-14: streaming Behringer'
 - Not a full replacement for X AIR Edit: no FX rack editing (choosing and tweaking effect types), no input/output routing, no USB routing, no automix, no DCA or mute-group setup in v1.
 - No snapshot recall or save in v1.
 - No recording, no audio streaming to phones.
-- Other mixer families (X32 and similar) are not targeted. XR12, XR16, and MR18 may work but are not tested.
+- The X32 family is not supported in this item, but must not be designed out (see Constraints). XR12, XR16, and MR18 may work but are not tested.
 
 ## User-visible behaviour
 
@@ -71,6 +71,7 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 ## Constraints
 - Runs as its own service on the Pi, separate from the visuals program, on its own port. The visuals control UI links to it and it links back.
 - Talks to the mixer with OSC over UDP on the local network, using the MIT-licensed `xair-api` Python library where it fits, and `python-osc` directly where it does not (for example meters or change subscriptions).
+- Everything specific to a mixer model lives in one **mixer profile**: channel, bus, and FX counts, which sections each strip has, the OSC port and addresses, parameter scaling, meter layout, and bus-linking rules. The service, the API, and the pages take all of this from the profile and never hard-code XR18 numbers. v1 ships one profile (XR18). This is what would let an X32 profile (32 channels, 16 buses, different port and meter layout) be added later as its own work item without rewriting the pages.
 - Pure-Python dependencies only; no build step for the web pages; no CDN.
 - CPU budget on a Pi 2: under 10% of one core with one engineer page and four musician pages open with meters running.
 - Meters update in the browser at about 10 times a second.
