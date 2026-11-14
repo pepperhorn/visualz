@@ -41,5 +41,7 @@ None.
 ---
 ## Receiver ack
 
+Acknowledged: move reconversion to a serial media-owned worker so Store.submit remains responsive; preserve fresh-directory conversion and failure reporting, and bound shutdown. I will change only the listed media files, new reconversion tests, and my handoffs. No open questions. GBrain: unavailable.
+
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)
