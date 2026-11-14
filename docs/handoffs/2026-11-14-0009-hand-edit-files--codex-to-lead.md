@@ -5,7 +5,7 @@
 - **Ledger:** 0009 · **Spec:** [0001](../specs/0001-audio-reactive-visuals.md) (AC6, AC15 and invalid hand-edit preservation) · **Plan:** quick task, none
 - **Branch:** orch/0009-hand-edit-files
 - **Worktree:** /home/t3box/.t3/worktrees/visualz/t3-eaeb49dd-35f767300013de77
-- **PR:** pending creation after this committed return
+- **PR:** https://github.com/pepperhorn/visualz/pull/7
 - **Base commit:** e98f86845036cf453750b67324216337dac8c57b (dispatch reference; branch includes subsequent main docs/status fixes)
 - **Port:** 5290 (no server started)
 - **Status:** closed
@@ -56,6 +56,7 @@ Lead acknowledges through the ledger; no implementer ledger changes made.
 ---
 ## Return
 - **Outcome:** done
+- **Implementation commits:** db4a877 (receiver acknowledgement), 5ec3af0 (implementation, regressions and return); final docs commit records the PR URL.
 - **Verification output:**
   ```text
   All checks passed!
