@@ -16,6 +16,8 @@ The band wants projected visuals at gigs that react to the music and keep evolvi
 - Overlays saved as JSON templates that work like slides: build a set in advance, then switch between them live.
 - A web UI to control everything from another device on the network.
 - Boots straight into the show on the Pi with no keyboard.
+- Runs on a Raspberry Pi 2 or 3.
+- Can use a USB webcam to take photos of the room at intervals and make visuals from them.
 
 ## Non-goals
 - No built-in audio input: the Pi has no onboard mic or line-in, so a USB audio device is required hardware.
@@ -23,18 +25,20 @@ The band wants projected visuals at gigs that react to the music and keep evolvi
 - No user accounts or auth on the control UI (trusted local network only).
 - No multi-projector mapping, edge blending, or keystone correction.
 - No in-browser shader editor. New modes are added in code.
-- Pi 3 and Pi Zero are not supported.
+- Pi Zero and Pi 1 are not supported.
+- No live webcam video on screen in v1: the camera supplies still photos only.
 
 ## User-visible behaviour
 
-### Stage (projector output, `/`)
-- Fullscreen canvas, no cursor, no browser chrome. Shows the active visual mode with the active overlay on top.
+### Stage (projector output)
+- Fullscreen on HDMI, no cursor, no desktop. Shows the active visual mode with the active overlay on top.
 - If audio is missing or silent, visuals keep moving on their own (idle animation), never a black or frozen screen.
-- If the server connection drops, the stage keeps running with its last state and reconnects by itself.
+- The stage never depends on a control device being connected.
 
 ### Audio
-- Input device is chosen in the control UI from the devices the stage browser reports. The choice persists across restarts.
+- Input device is chosen in the control UI from the capture devices the Pi reports. The choice persists across restarts.
 - Analysis produces: overall level, bass / mid / treble energy, a spectrum, and beat onsets. All are smoothed and auto-gained so a quiet room and a loud stage both give a usable range.
+- The expected source is a stereo line feed (two line inputs) through a USB audio interface. Left and right are analysed together for levels and beats, and are also available separately so modes can use the stereo image. Mono sources work too.
 - Controls: input gain, sensitivity, smoothing. A live level meter in the control UI shows the signal is arriving.
 
 ### Visual modes
@@ -48,7 +52,7 @@ Each mode is a shader with the shared audio inputs, a slow "evolution" clock so 
 | `liquid` | Oil-and-water liquid light show: drifting blobs and bubbles, lens-like colour |
 | `opart` | High-contrast warped moiré / illusion pattern |
 | `plasma` | Classic demoscene plasma and tunnel, the simplest all-purpose mode |
-| `chromascope` | Analogue video-synth look: glowing, feedback-trailed ribbons and Lissajous-style figures drawn directly from the audio waveform, with drifting colour |
+| `chromascope` | Analogue video-synth look: glowing, feedback-trailed ribbons and Lissajous-style figures drawn directly from the audio waveform (left channel against right when the source is stereo), with drifting colour |
 | `gallery` | Morphs generatively through a set of uploaded pictures (see below) |
 
 **Gallery mode.** The user uploads a set of pictures (JPEG/PNG/WebP) into one or more named picture sets. The mode shows them as living images rather than a slideshow:
@@ -57,6 +61,15 @@ Each mode is a shader with the shared audio inputs, a slow "evolution" clock so 
 - Order is sequential or shuffled; pictures are cropped to fill or fitted with a blurred fill behind.
 - This is shader-based morphing of the supplied pictures. It does not generate new imagery with an AI model (not feasible live on a Pi).
 - Pictures are downscaled on upload to a size the Pi's GPU can hold.
+
+**Camera as a picture source.** With a USB webcam attached, a picture set can be fed by the camera instead of uploads:
+- The camera takes a still photo every N seconds (default 30, minimum 5), or on demand from a "snap now" button.
+- The set keeps the most recent M photos (default 12) and drops the oldest, so the gallery is always morphing through the last few minutes of the room.
+- A camera set can be mixed with uploaded pictures (e.g. band photos interleaved with crowd shots).
+- Camera photos get the same treatment as any picture: transitions, audio-reactive warping, the amount control, and the pixel and halftone looks.
+- Photos are kept in memory only by default and are gone at power-off. A setting saves them to `data/` instead; a button deletes all camera photos.
+- The control UI shows the latest photo so the camera can be aimed, with controls for mirror, rotation, and brightness.
+- If no camera is attached, the camera options are hidden and nothing else changes.
 
 Global look controls, applied to every mode:
 - **Pixel size** (1 = off, up to chunky blocks), **colour depth** (full, or quantised to a palette of 4 to 256 colours), **dither** on/off.
@@ -71,7 +84,7 @@ Mode switching:
 
 ### Overlay
 The overlay is described by a JSON **overlay template**. A template contains:
-- **Logo bug**: asset (uploaded image — PNG/SVG/GIF/WebP — or video — MP4/WebM, looped and muted), corner (default bottom-right), size, margin, opacity. Optional.
+- **Logo bug**: asset (uploaded image — PNG/SVG/GIF/WebP — or video — MP4/WebM/GIF, converted on upload to a short silent loop of at most 10 seconds), corner (default bottom-right), size, margin, opacity. Optional.
 - **Text blocks** (zero or more), each with: text, position (corner / lower-third / centre, plus offsets), font family, size, weight, letter-spacing, upper-case toggle, text colour, optional background box colour and padding, optional outline or shadow colour, alignment.
 - **Animation**: how the overlay enters and leaves (cut, fade, slide, or MTV-style: show for N seconds at the start, then hide; optionally reappear every M minutes).
 - A name and an order index.
@@ -80,7 +93,7 @@ Behaviour:
 - Templates are files (`data/overlays/<id>.json`), validated against a published schema. They can be edited in the UI or by hand, exported, and imported.
 - The control UI shows templates as an ordered list of slides with a preview. Tap one to take it live. Next / previous buttons and a "clear overlay" button are always visible.
 - Text can use `{{variables}}` (e.g. `{{band}}`, `{{song}}`) filled from a small live "now playing" form, so one lower-third template serves every song.
-- **Fonts**: a bundled set of open-licence fonts (including at least two pixel fonts and two bold display fonts) plus uploaded font files (WOFF2/TTF/OTF). Any font is selectable per text block.
+- **Fonts**: a bundled set of open-licence fonts (including at least two pixel fonts and two bold display fonts) plus uploaded font files (TTF/OTF). Any font is selectable per text block.
 - **Colours**: every colour in a template is a free hex/alpha value, picked with a colour picker. A template may also reference named theme colours (`primary`, `accent`, `text`, `background`) defined once in settings, so a whole set can be re-coloured in one place.
 - The first run ships three example templates: logo bug only, lower-third (band + song), and full title card.
 
@@ -91,14 +104,15 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 - Two control devices open at once stay in sync.
 
 ### On the Pi
-- One install script sets up the app as a service and Chromium in kiosk mode on boot.
+- One install script sets up the app as a service that starts on boot and draws straight to HDMI. No desktop is needed.
 - After power-on, the show is on the projector within about a minute with the last-used settings.
 - The control UI is reachable at `http://<hostname>.local:<port>/control`; the address is shown on the stage for the first 20 seconds after boot.
 
 ## Constraints
-- Hardware target: Raspberry Pi 4 (4 GB) or Pi 5, Raspberry Pi OS (Bookworm or later, 64-bit, desktop), HDMI out. USB audio class device for input.
-- Performance: at least 30 fps at 1280×720 output on a Pi 4 for every mode at default settings; the internal render resolution is adjustable to hold that.
-- Stack per ADR 0001: TypeScript, Vite, WebGL2, Web Audio, Node server with WebSocket, Zod schemas, Vitest.
+- Hardware target: Raspberry Pi 2 (v1.1 or v1.2) and Pi 3 (B, B+), 1 GB RAM, Raspberry Pi OS Lite (Bookworm, 32-bit so one image serves both), HDMI out. USB audio class interface with stereo line input. Optional USB (UVC) webcam.
+- GPU limits: OpenGL ES 2.0 only (GLSL ES 1.00). No WebGL2/ES3 features, short shaders, small textures (2048 px maximum, and few of them).
+- Performance: output is 1280×720. Modes render at a low internal resolution and are upscaled (default 480×270 on a Pi 3, 320×180 on a Pi 2). At those defaults every mode holds at least 30 fps on a Pi 3 and at least 24 fps on a Pi 2. A per-mode quality setting may simplify the heavy modes on a Pi 2.
+- Stack per ADR 0002: one Python 3 program (SDL2 on KMS/DRM, OpenGL ES 2.0, ALSA capture, Pillow for text) with an embedded web server; control UI is static HTML/JS with no build step. Python dependencies must be installable from Raspberry Pi OS apt packages.
 - No network needed at the venue beyond the control device reaching the Pi. No CDN assets: fonts and libraries are bundled.
 - All persistent state lives in one `data/` directory (settings, scenes, overlays, uploaded assets) so it can be backed up or copied between Pis.
 - Uploads are size-limited and type-checked; file names are sanitised.
@@ -117,16 +131,19 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 - [ ] AC11 — `{{band}}` / `{{song}}` variables update on the stage when the now-playing form changes.
 - [ ] AC12 — Changing a theme colour re-colours every template that references it.
 - [ ] AC13 — Templates can be exported and re-imported (including on another install) with their assets.
-- [ ] AC14 — Two control clients stay in sync; the stage recovers by itself from a server restart.
+- [ ] AC14 — Two control clients stay in sync; control clients reconnect by themselves after the app restarts.
 - [ ] AC15 — Settings persist across a restart.
-- [ ] AC16 — On a Pi 4 at 720p, each mode holds at least 30 fps at default settings (measured with the built-in fps readout).
-- [ ] AC17 — The install script on a fresh Raspberry Pi OS desktop image results in the stage on HDMI after reboot, with audio capture working and no permission prompt.
-- [ ] AC18 — `npm run lint && npm test && npm run build` passes.
-- [ ] AC19 — `chromascope` draws figures that follow the live waveform and leave fading trails.
+- [ ] AC16 — At default settings each mode holds at least 30 fps on a Pi 3 and at least 24 fps on a Pi 2 (measured with the built-in fps readout).
+- [ ] AC17 — The install script on a fresh Raspberry Pi OS Lite image results in the stage on HDMI after reboot, with audio capture working.
+- [ ] AC18 — `.venv/bin/ruff check . && .venv/bin/pytest` passes.
+- [ ] AC19 — `chromascope` draws figures that follow the live waveform and leave fading trails; with a stereo source the figure changes when left and right differ.
 - [ ] AC20 — With a picture set of at least three uploaded images, `gallery` moves through them with generative transitions (by time, by beats, and manually), each held picture reacts to audio, and the amount control visibly ranges from near-clean to heavily abstracted.
+- [ ] AC21 — With a USB webcam attached, a camera picture set fills with photos at the set interval and on "snap now", keeps only the most recent M, and `gallery` morphs through them; the latest photo shows in the control UI; with no webcam the app runs normally.
+- [ ] AC22 — Camera photos are not written to disk unless the save setting is on, and "delete all camera photos" removes them.
 
 ## Open questions
-1. **Which Pi?** Assumed Pi 4 (4 GB) or Pi 5. Confirm, or say which model you have.
-2. **Audio feed at gigs**: a USB mic in the room, or a line feed from the desk into a USB interface? Both work; it only changes the recommended hardware and default gain.
-3. **Venue network**: is there usually Wi-Fi the Pi and your phone can share? If not, a follow-up item can make the Pi its own hotspot (deferred, not in v1).
-4. **Licence** for the public repo (MIT suggested). Deferred until you say.
+Answered 2026-11-14: hardware is a Pi 2 or 3; audio is two line inputs through a USB interface; the renderer is native (ADR 0002).
+
+1. **Audio interface**: the USB device needs line *inputs*. A box sold as a "DAC" is often output-only, so check yours has a line-in / ADC. Deferred: hardware check by the human.
+2. **Venue network**: is there usually Wi-Fi the Pi and your phone can share? If not, a follow-up item can make the Pi its own hotspot (deferred, not in v1; the Pi 2 has no built-in Wi-Fi and would need a USB dongle or Ethernet).
+3. **Licence** for the public repo (MIT suggested). Deferred until you say.

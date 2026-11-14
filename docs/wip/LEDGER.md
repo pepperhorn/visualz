@@ -29,4 +29,5 @@ Last health scan: never
 
 ## Log
 <!-- One line per status change, newest first: YYYY-MM-DD NNNN old→new — note -->
+2026-11-14 0001 planned→planned — retargeted to Pi 2/3: ADR 0002 (native renderer) accepted, ADR 0001 superseded; added halftone, chromascope, gallery, webcam source
 2026-11-14 0001 —→planned — spec, plan, and ADR 0001 drafted; waiting on human approval

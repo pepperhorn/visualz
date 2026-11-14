@@ -77,7 +77,7 @@ Related words: **"park"** means write a handoff addressed to `future` and set th
 - **Code reaches `main` only through a PR**: implementer opens it → reviewer reviews it → lead merges it. Docs and ledger commits by the lead go straight to `main`.
 - Implementers push only their own branch (`git push -u origin orch/K-<slug>`) and open a **draft PR** against `main`. Never merge, never push to `main`, never rebase someone else's branch.
 - All agents share one GitHub account, and GitHub won't let an account approve or request changes on its own PR. Reviewers post `gh pr review --comment` with a verdict line. The verdict is what decides the outcome, not GitHub's approval state.
-- Worktrees don't get untracked files such as `.env`. The setup is: `npm ci (no secrets or .env needed)`.
+- Worktrees don't get untracked files such as `.env`. The setup is: `python3 -m venv .venv && .venv/bin/pip install -e '.[dev]' (no secrets or .env needed)`.
 - Dev servers in worktrees use the port from the handoff (`5200 + NNNN*10 + N`, where N = 0 for a single-task item), always with `--host 0.0.0.0`.
 
 ## 5. Ledger rules
@@ -102,7 +102,7 @@ Related words: **"park"** means write a handoff addressed to `future` and set th
 ## 6. Definition of done (implementer)
 
 - [ ] Acceptance criteria in the handoff are met
-- [ ] Verification commands pass: `npm run lint && npm test && npm run build`
+- [ ] Verification commands pass: `.venv/bin/ruff check . && .venv/bin/pytest`
 - [ ] Only the files you own were changed (`git diff --stat main...HEAD`)
 - [ ] Return handoff written and committed on your branch
 - [ ] Branch pushed and draft PR opened; its body links the handoffs and pastes the verification output

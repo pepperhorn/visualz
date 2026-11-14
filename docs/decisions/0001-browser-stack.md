@@ -1,6 +1,6 @@
 # ADR 0001 — Render in a kiosk browser (WebGL + Web Audio), served by a small Node server
 
-- **Status:** proposed (accepted when spec 0001 is approved)
+- **Status:** superseded by 0002 (never built: the target hardware changed to Pi 2/3)
 - **Date:** 2026-11-14 · **Work item:** 0001
 
 ## Context
