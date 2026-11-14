@@ -38,8 +38,14 @@ from visualz.state import COLLECTIONS, merge
 from visualz.state.runtime import CommandQueueFull
 
 
+MAX_COMMAND_BODY = 64 * 1024
+
+
 @web.middleware
 async def errors(request, handler):
+    if request.method == "POST" and request.path == "/api/stage/command":
+        # Share the bounded request/cache with both the handler and error replies.
+        request = request.clone(client_max_size=MAX_COMMAND_BODY)
     try:
         return await handler(request)
     except CommandQueueFull as exc:
@@ -277,6 +283,8 @@ def create_app(store, telemetry=None, web_dir=None):
                     try:
                         body = json.loads(msg.data)
                         if body.get("type") == "command":
+                            if len(msg.data.encode("utf-8")) > MAX_COMMAND_BODY:
+                                raise ValueError(f"Command message exceeds {MAX_COMMAND_BODY} bytes")
                             loop = asyncio.get_running_loop()
 
                             def result_ready(result):
@@ -305,7 +313,7 @@ def create_app(store, telemetry=None, web_dir=None):
                                 "id": body.get("id") if isinstance(body, dict) else None,
                             },
                         )
-                    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                    except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as exc:
                         await send(
                             ws,
                             {
@@ -385,7 +393,11 @@ def create_app(store, telemetry=None, web_dir=None):
         return web.Response(body=output.getvalue(), content_type="image/png")
 
     async def stage_command(request):
-        ack = store.runtime.enqueue_command(await request.json())
+        try:
+            body = await request.json()
+        except RecursionError as exc:
+            raise ValueError("Command JSON nesting is too deep") from exc
+        ack = store.runtime.enqueue_command(body)
         return web.json_response(ack, status=202)
 
     async def command_result(request):

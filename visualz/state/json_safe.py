@@ -6,6 +6,9 @@ from collections.abc import Sized
 from threading import RLock
 
 
+MAX_JSON_DEPTH = 32
+
+
 class JsonCoercer:
     def __init__(self):
         self._warned = set()
@@ -22,11 +25,17 @@ class JsonCoercer:
             return f"<{type(value).__module__}.{type(value).__name__}>"
 
     def _check_size(self, value, key, remaining, seen):
-        """Bound aggregate container slots/bytes before allocating conversions."""
-        if id(value) in seen:
-            return
-        seen.add(id(value))
-        try:
+        """Iteratively bound aggregate size and nesting before conversions."""
+        pending = [(value, 0, False)]
+        while pending:
+            value, depth, exiting = pending.pop()
+            if exiting:
+                seen.remove(id(value))
+                continue
+            if depth > MAX_JSON_DEPTH:
+                raise ValueError(f"{key}: nesting exceeds {MAX_JSON_DEPTH} levels")
+            if id(value) in seen:
+                continue
             if isinstance(value, dict):
                 remaining[0] -= 2 * len(value)
                 children = (child for pair in value.items() for child in pair)
@@ -35,6 +44,8 @@ class JsonCoercer:
                 children = iter(value)
             elif type(value).__module__.split(".")[0] == "numpy":
                 remaining[0] -= int(getattr(value, "size", 1))
+                if depth + int(getattr(value, "ndim", 0)) > MAX_JSON_DEPTH:
+                    raise ValueError(f"{key}: nesting exceeds {MAX_JSON_DEPTH} levels")
                 # Object arrays can themselves contain sequences or arrays.
                 children = (
                     iter(value.flat)
@@ -46,18 +57,26 @@ class JsonCoercer:
                 remaining[0] -= value.nbytes if isinstance(value, memoryview) else len(value)
                 children = ()
             else:
-                return
+                continue
             if remaining[0] < 0:
                 raise ValueError(f"{key}: total size exceeds the {remaining[1]} element status limit")
-            for child in children:
-                self._check_size(child, key, remaining, seen)
-        finally:
-            seen.remove(id(value))
+            seen.add(id(value))
+            pending.append((value, depth, True))
+            pending.extend((child, depth + 1, False) for child in children)
+
+    def check_size(self, value, key, max_elements):
+        """Reject oversized values and normalize failures from custom size accessors."""
+        try:
+            self._check_size(value, key, [max_elements, max_elements], set())
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise ValueError(f"{key}: unable to check total size") from exc
 
     def __call__(self, value, key="status", _seen=None, *, max_elements=None):
         # Opt-in at publication only: defensive send-time coercion stays tolerant.
         if max_elements is not None:
-            self._check_size(value, key, [max_elements, max_elements], set())
+            self.check_size(value, key, max_elements)
         seen = set() if _seen is None else _seen
         if value is None or isinstance(value, (str, bool, int)):
             return value

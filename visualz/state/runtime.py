@@ -13,6 +13,7 @@ connection. The last 128 results are retained; do not reuse a cached id.
 Handler failures appear in caller results and status.commands, never escape.
 Command status contains bounded summaries, never raw arguments/return values;
 publication failures are logged without preventing client result callbacks.
+Command args share MAX_STATUS_ELEMENTS; oversized args are rejected before copying or queueing.
 Full queues return HTTP 503 / Retry-After: 1 (WS error status/retry_after).
 
 Initial commands (args are keyword arguments): audio.refresh_devices();
@@ -32,7 +33,9 @@ levels {level,left,right,bass,mid,treble,beat}. Camera: present, devices, latest
 (image endpoint name or null). Stage: fps, gl_renderer, hardware_profile (detected
 low/high; null until T2 detects), requested_profile, resolution, hostname,
 ip_addresses, state_recovered. publish_image(name, bytes, content_type) publishes
-bounded in-memory snapshots exposed at /api/stage/image/<name>; None removes one.
+bounded in-memory snapshots at /api/stage/image/<name>; None removes one.
+Image metadata shares MAX_STATUS_ELEMENTS and is coerced outside the lock.
+All size-checked publications and command args also share MAX_JSON_DEPTH.
 """
 
 from copy import deepcopy
@@ -75,7 +78,7 @@ class Runtime:
             or set(envelope) - {"target", "name", "args", "id"}
         ):
             raise ValueError("Command requires target, name, args and optional id")
-        envelope = deepcopy(envelope)
+        envelope = {**envelope}
         envelope.setdefault("id", uuid4().hex)
         if (
             isinstance(envelope["id"], bool)
@@ -88,6 +91,8 @@ class Runtime:
             for k in ("target", "name")
         ) or not isinstance(envelope["args"], dict):
             raise ValueError("Command target/name must be identifiers and args an object")
+        self.coerce.check_size(envelope["args"], "command.args", MAX_STATUS_ELEMENTS)
+        envelope = deepcopy(envelope)
         with self._lock:
             if str(envelope["id"]) in self._results:
                 raise ValueError("Command id is already in use; choose a unique id")
@@ -185,17 +190,25 @@ class Runtime:
             or content_type not in ("image/jpeg", "image/png", "image/webp")
         ):
             raise ValueError("Image must be JPEG/PNG/WebP and at most 2 MiB")
+        if content is not None:
+            key = f"images.{name}"
+            metadata = {} if metadata is None else metadata
+            if not isinstance(metadata, dict):
+                raise ValueError("Image metadata must be an object")
+            metadata = self.coerce(
+                {**metadata, "content_type": content_type, "bytes": len(content)},
+                key,
+                max_elements=MAX_STATUS_ELEMENTS,
+            )
+            content = bytes(content)
         with self._lock:
             images = self._status.get("images", {}).copy()
             if content is None:
                 self._images.pop(name, None)
                 images.pop(name, None)
             else:
-                self._images[name] = (bytes(content), content_type)
-                images[name] = self.coerce(
-                    {**(metadata or {}), "content_type": content_type, "bytes": len(content)},
-                    f"images.{name}",
-                )
+                self._images[name] = (content, content_type)
+                images[name] = metadata
             self._status["images"] = images
 
     def image(self, name):
