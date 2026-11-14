@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "band": {
+      "type": "string"
+    },
+    "song": {
+      "type": "string"
+    },
+    "extra": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": {
+    "type": "string"
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

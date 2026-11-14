@@ -78,7 +78,7 @@ None.
 
 ---
 ## Receiver ack
-<!-- Implementer fills this in FIRST and commits it on its branch: a restatement of the goal in their own words, plus any questions. "Blocked: <q>" is a valid ack. -->
+Acknowledged: I will build the Python 3.11 foundation, complete persistent JSON contracts, thread-safe store, aiohttp API and WebSocket synchronisation, bounded media ingest, ES 2 helpers, documented neutral worker interfaces and animated test pattern, plus the standalone Pi smoke test. I will change only the listed owned files and my task handoffs, verify headlessly, and return a draft PR. Hardware verification remains with the human. GBrain: unavailable. Open questions: none.
 
 ---
 ## Return (implementer → lead; fill in when done, or in a separate …-to-lead.md)

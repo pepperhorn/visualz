@@ -1,0 +1,263 @@
+{
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_-]{1,100}$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "order": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "logo": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "asset": {
+              "type": "string",
+              "pattern": "^assets/[a-zA-Z0-9_][a-zA-Z0-9_.-]*(?:/[a-zA-Z0-9_][a-zA-Z0-9_.-]*)*$",
+              "maxLength": 240
+            },
+            "corner": {
+              "enum": [
+                "top-left",
+                "top-right",
+                "bottom-left",
+                "bottom-right"
+              ]
+            },
+            "size": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 2048
+            },
+            "margin": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 500
+            },
+            "opacity": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "required": [
+            "asset",
+            "corner",
+            "size",
+            "margin",
+            "opacity"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "texts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "position": {
+            "enum": [
+              "top-left",
+              "top-right",
+              "bottom-left",
+              "bottom-right",
+              "lower-third",
+              "centre"
+            ]
+          },
+          "x": {
+            "type": "number",
+            "minimum": -4096,
+            "maximum": 4096
+          },
+          "y": {
+            "type": "number",
+            "minimum": -4096,
+            "maximum": 4096
+          },
+          "font": {
+            "type": "string"
+          },
+          "font_asset": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^assets/[a-zA-Z0-9_][a-zA-Z0-9_.-]*(?:/[a-zA-Z0-9_][a-zA-Z0-9_.-]*)*$",
+                "maxLength": 240
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "size": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 100,
+            "maximum": 900
+          },
+          "letter_spacing": {
+            "type": "number",
+            "minimum": -20,
+            "maximum": 100
+          },
+          "uppercase": {
+            "type": "boolean"
+          },
+          "colour": {
+            "type": "string",
+            "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+          },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "padding": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 200
+          },
+          "outline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "outline_width": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 20
+          },
+          "shadow": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shadow_x": {
+            "type": "number",
+            "minimum": -100,
+            "maximum": 100
+          },
+          "shadow_y": {
+            "type": "number",
+            "minimum": -100,
+            "maximum": 100
+          },
+          "align": {
+            "enum": [
+              "left",
+              "centre",
+              "right"
+            ]
+          }
+        },
+        "required": [
+          "text",
+          "position",
+          "font",
+          "size",
+          "colour"
+        ],
+        "additionalProperties": false
+      },
+      "maxItems": 50
+    },
+    "animation": {
+      "type": "object",
+      "properties": {
+        "enter": {
+          "enum": [
+            "cut",
+            "fade",
+            "slide",
+            "mtv"
+          ]
+        },
+        "leave": {
+          "enum": [
+            "cut",
+            "fade",
+            "slide",
+            "mtv"
+          ]
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 30
+        },
+        "show_seconds": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "repeat_minutes": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1440
+        }
+      },
+      "required": [
+        "enter",
+        "leave",
+        "duration",
+        "show_seconds",
+        "repeat_minutes"
+      ],
+      "additionalProperties": false
+    },
+    "variables": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "order",
+    "logo",
+    "texts",
+    "animation",
+    "variables"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}
