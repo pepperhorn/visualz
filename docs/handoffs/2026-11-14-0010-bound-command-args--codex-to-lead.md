@@ -6,7 +6,7 @@
 - **Dispatch:** [lead → codex](2026-11-14-0010-bound-command-args--lead-to-codex.md)
 - **Branch:** orch/0010-bound-command-args
 - **Worktree:** /home/t3box/.t3/worktrees/visualz/t3-a3b90767-d9bddebb355b5d35
-- **PR:** pending creation after this handoff commit
+- **PR:** https://github.com/pepperhorn/visualz/pull/6 (draft)
 - **Base commit:** 7e90fe1 (starting checkout; includes the dispatch)
 - **Implementation commit:** b47470e74990f80e1c08713676bb099ba5891ee5
 - **Port:** 5300 (no server left running)
