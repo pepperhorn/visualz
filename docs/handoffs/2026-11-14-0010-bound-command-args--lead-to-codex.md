@@ -7,7 +7,7 @@
 - **PR:** —
 - **Base commit:** e98f86845036cf453750b67324216337dac8c57b
 - **Port (if running a server):** 5300
-- **Status:** open
+- **Status:** closed
 
 ## Goal
 Defence in depth for the command path, which any phone on the venue Wi-Fi can reach:
