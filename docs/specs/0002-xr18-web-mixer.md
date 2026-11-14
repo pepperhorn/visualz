@@ -49,8 +49,13 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 - A "reset section" button on EQ, gate, and compressor, with confirmation.
 
 ### Musician page (`/mixer/me/<bus>`)
-- Shows only the sends into that musician's bus, plus the bus master level. Nothing on this page can change the main mix or another bus.
-- Each bus can be given a musician name and a maximum master level (a cap) from the engineer page.
+- A **monitor mix** is either one bus (mono, typically a wedge) or a stereo-linked pair of buses (typically in-ears). Linking is read from the mixer: a linked pair appears as one mix everywhere, with one page, one QR code, and one master.
+- The engineer sets each mix up once: the musician's name, the type (**wedge** or **in-ear**), and a maximum master level (a cap). Mixes can be any combination, for example two in-ear pairs and two wedges across the six buses.
+- The page shows only the sends into that mix, plus its master level. Nothing on this page can change the main mix or another musician's mix.
+- **In-ear mixes** also show a pan control per channel, so the musician can place instruments left and right. Wedge mixes have no pan.
+- **In-ear safety**: level rises are ramped rather than instant, the cap applies, and the page shows the mix's output meter so the musician can see how hot it is.
+- **Wedge mixes** show a note on the engineer side only: the bus EQ (in channel detail) is where feedback is notched, and musicians cannot reach it.
+- A shared wedge can be opened by more than one musician at once; they see each other's changes.
 - "More me" shortcut: the musician marks which channels are theirs, and one big control raises those against everything else.
 - The engineer page shows a QR code and link for each bus so a musician can open their page by scanning.
 - A musician can save their mix as a named profile and reload it at the next gig.
@@ -77,10 +82,11 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 - [ ] AC2 — Moving a fader or mute on the page changes the simulated mixer; changing the simulated mixer from elsewhere updates open pages within 0.5 s.
 - [ ] AC3 — Sends on faders: selecting a bus makes the faders control that bus's sends.
 - [ ] AC4 — Meters animate from simulated meter data at about 10 Hz.
-- [ ] AC5 — A musician page can only change its own bus's sends and master: requests for anything else are rejected by the server, not just hidden in the page.
+- [ ] AC5 — A musician page can only change its own mix's sends (and pan, for in-ears) and master: requests for anything else are rejected by the server, not just hidden in the page.
 - [ ] AC6 — The bus cap is enforced by the server.
 - [ ] AC7 — "More me" raises the marked channels against the rest within the bus and stays within the cap.
 - [ ] AC8 — QR codes on the engineer page open the right musician page.
+- [ ] AC21 — A stereo-linked bus pair on the (simulated) mixer appears as one in-ear mix with per-channel pan; unlinking it on the mixer turns it back into two mono mixes. Level rises on an in-ear mix are ramped. A wedge mix has no pan control.
 - [ ] AC9 — Musician profiles save, survive a restart, and reload.
 - [ ] AC10 — With a PIN set, the engineer page is refused without it and musician pages still work.
 - [ ] AC11 — Rate limit and step limit are enforced by the server.
@@ -95,5 +101,6 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 - [ ] AC15 — (Human, real hardware) With the real XR18 on the venue router: discovery, faders, mutes, meters, a musician page, and channel detail (gain, phantom, sends, EQ, gate, compressor) all work, and stay in sync with X AIR Edit on another device.
 
 ## Open questions
-1. **How do you run monitors?** I assumed each musician has one of the six buses (mono). If you use stereo-linked buses for in-ears, say so and the musician page will treat a linked pair as one mix.
-2. **Is an engineer PIN wanted by default**, or off unless you turn it on? Assumed off. Now that gain and phantom power are controllable from the page, I recommend on.
+Answered 2026-11-14: monitors are a combination of wedges and in-ear feeds, so both mono and stereo-linked mixes are supported.
+
+1. **Is an engineer PIN wanted by default**, or off unless you turn it on? Assumed off. Now that gain and phantom power are controllable from the page, I recommend on.

@@ -25,9 +25,9 @@ The mixer link keeps the connection alive with the mixer's periodic "remote" sub
 - **Depends on:** 0001 T1 merged
 - **Route:** implement (default)
 - **Owns:** `visualz/mixer/**`, `tests/mixer/**`, `deploy/visualz-mixer.service`
-- **Acceptance:** AC1, AC2, AC4 to AC7, AC9 to AC14, AC16, AC17, AC19, AC20 at the API level, all against `sim.py`
+- **Acceptance:** AC1, AC2, AC4 to AC7, AC9 to AC14, AC16, AC17, AC19 to AC21 at the API level, all against `sim.py`
 - **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
-- **Notes / gotchas:** read the `xair-api` source before relying on it: confirm whether it exposes change subscription and meters, and whether its blocking getters (20 ms delay each) are acceptable for the initial state load, or whether a bulk read with `python-osc` is needed. X-Air OSC is on UDP port 10024; the remote subscription expires after about 10 seconds and must be renewed. Fader values on the wire are 0.0 to 1.0, not dB, and most EQ and dynamics parameters are likewise normalised with their own scaling curves (linear, log, or stepped): put every conversion in one tested module (`units.py`) so pages always show real units. Phantom power and gain live under the headamp addresses, not the channel addresses. The simulator must hold the full parameter set for a channel so round-trips can be tested. Record in the return handoff exactly which OSC addresses were used and which were verified only against the simulator. Adding the dependency to `pyproject.toml` needs the lead's OK in the handoff, since T1 does not own that file.
+- **Notes / gotchas:** read the `xair-api` source before relying on it: confirm whether it exposes change subscription and meters, and whether its blocking getters (20 ms delay each) are acceptable for the initial state load, or whether a bulk read with `python-osc` is needed. X-Air OSC is on UDP port 10024; the remote subscription expires after about 10 seconds and must be renewed. Fader values on the wire are 0.0 to 1.0, not dB, and most EQ and dynamics parameters are likewise normalised with their own scaling curves (linear, log, or stepped): put every conversion in one tested module (`units.py`) so pages always show real units. Phantom power and gain live under the headamp addresses, not the channel addresses. The simulator must hold the full parameter set for a channel so round-trips can be tested. Bus linking is mixer configuration (pairs 1-2, 3-4, 5-6): read it at connect and follow changes; on a linked pair the send has a level and a pan instead of two levels, so the model exposes a mix abstraction (one or two buses) and pages never address raw buses. Record in the return handoff exactly which OSC addresses were used and which were verified only against the simulator. Adding the dependency to `pyproject.toml` needs the lead's OK in the handoff, since T1 does not own that file.
 
 ### T3 — Channel detail pages
 - **Depends on:** T1, T2
@@ -41,7 +41,7 @@ The mixer link keeps the connection alive with the mixer's periodic "remote" sub
 - **Depends on:** T1; 0001 T4 merged (UI shell and styles)
 - **Route:** implement (alt)
 - **Owns:** `web/mixer/**`, `tests/web/mixer/**`
-- **Acceptance:** AC3, AC8, and the page side of AC1, AC2, AC4, AC5, AC7, AC9, AC10, AC12
+- **Acceptance:** AC3, AC8, and the page side of AC1, AC2, AC4, AC5, AC7, AC9, AC10, AC12, AC21
 - **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
 - **Notes / gotchas:** faders must be usable with a thumb on a phone and must not jump on tap. QR codes are generated locally (vendored small library, licence recorded), not from a web service. Develop against `python -m visualz.mixer --sim`.
 
