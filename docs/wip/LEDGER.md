@@ -31,6 +31,7 @@ Last health scan: never
 
 ## Log
 <!-- One line per status change, newest first: YYYY-MM-DD NNNN old→new — note -->
+2026-11-14 0002 planned→planned — scope grown at the human's request: per-channel sends, preamp gain, phantom power, EQ, gate, compressor (new task T3)
 2026-11-14 0002 —→planned — spec and plan drafted (built-in web mixer chosen over BandPilot and X AIR Edit remote desktop)
 2026-11-14 0001 planned→planned — MIT licence added; XR18 over USB is the audio source; all open questions answered
 2026-11-14 0001 planned→planned — retargeted to Pi 2/3: ADR 0002 (native renderer) accepted, ADR 0001 superseded; added halftone, chromascope, gallery, webcam source

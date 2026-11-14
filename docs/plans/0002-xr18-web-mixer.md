@@ -25,9 +25,17 @@ The mixer link keeps the connection alive with the mixer's periodic "remote" sub
 - **Depends on:** 0001 T1 merged
 - **Route:** implement (default)
 - **Owns:** `visualz/mixer/**`, `tests/mixer/**`, `deploy/visualz-mixer.service`
-- **Acceptance:** AC1, AC2, AC4 to AC7, AC9 to AC14 at the API level, all against `sim.py`
+- **Acceptance:** AC1, AC2, AC4 to AC7, AC9 to AC14, AC16, AC17, AC19, AC20 at the API level, all against `sim.py`
 - **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
-- **Notes / gotchas:** read the `xair-api` source before relying on it: confirm whether it exposes change subscription and meters, and whether its blocking getters (20 ms delay each) are acceptable for the initial state load, or whether a bulk read with `python-osc` is needed. X-Air OSC is on UDP port 10024; the remote subscription expires after about 10 seconds and must be renewed. Fader values on the wire are 0.0 to 1.0, not dB. Record in the return handoff exactly which OSC addresses were used and which were verified only against the simulator. Adding the dependency to `pyproject.toml` needs the lead's OK in the handoff, since T1 does not own that file.
+- **Notes / gotchas:** read the `xair-api` source before relying on it: confirm whether it exposes change subscription and meters, and whether its blocking getters (20 ms delay each) are acceptable for the initial state load, or whether a bulk read with `python-osc` is needed. X-Air OSC is on UDP port 10024; the remote subscription expires after about 10 seconds and must be renewed. Fader values on the wire are 0.0 to 1.0, not dB, and most EQ and dynamics parameters are likewise normalised with their own scaling curves (linear, log, or stepped): put every conversion in one tested module (`units.py`) so pages always show real units. Phantom power and gain live under the headamp addresses, not the channel addresses. The simulator must hold the full parameter set for a channel so round-trips can be tested. Record in the return handoff exactly which OSC addresses were used and which were verified only against the simulator. Adding the dependency to `pyproject.toml` needs the lead's OK in the handoff, since T1 does not own that file.
+
+### T3 — Channel detail pages
+- **Depends on:** T1, T2
+- **Route:** implement (alt)
+- **Owns:** `web/mixer/channel/**`, `tests/web/mixer/channel/**`
+- **Acceptance:** AC18, and the page side of AC16, AC17, AC19, AC20
+- **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
+- **Notes / gotchas:** the EQ curve is computed in the browser from the band settings (standard biquad responses) and drawn on a canvas; dragging a band handle sets frequency and gain, pinch or a slider sets width. Every control also has a number field. Phantom confirmation is enforced by the server with a two-step request, not only by a dialog. T2 leaves a link from each strip name to `channel/`; anything else T3 needs in T2's files goes through the lead.
 
 ### T2 — Mixer pages
 - **Depends on:** T1; 0001 T4 merged (UI shell and styles)
@@ -38,9 +46,10 @@ The mixer link keeps the connection alive with the mixer's periodic "remote" sub
 - **Notes / gotchas:** faders must be usable with a thumb on a phone and must not jump on tap. QR codes are generated locally (vendored small library, licence recorded), not from a web service. Develop against `python -m visualz.mixer --sim`.
 
 ## Merge order
-T1 → T2 → human runs AC15 on the real mixer.
+T1 → T2 → T3 → human runs AC15 on the real mixer.
 
 ## Risks
+- **Parameter scaling**: wrong conversion between the mixer's normalised values and real units would show or set wrong EQ, dynamics, or gain values. Mitigation: one conversion module with tests, and a human spot-check against X AIR Edit as part of AC15.
 - **No real mixer in development**: everything is verified against a simulator written from documentation, so real-hardware differences are likely. Mitigation: AC15 is a human check, and T1 lists every unverified OSC address.
-- **Live-sound risk**: a bug here can change levels on stage. Mitigation: server-side caps, rate and step limits, no gain or phantom control, and the first real-hardware test should be done away from a gig with speakers turned down.
+- **Live-sound risk**: a bug here can change levels on stage. Mitigation: server-side caps, rate and step limits, confirmation on phantom power, small steps on gain, engineer-only access to preamp, EQ and dynamics, and the first real-hardware test should be done away from a gig with speakers turned down.
 - **Wi-Fi reliability** at venues affects UDP control. Mitigation: visible connection state and automatic reconnect; the mixer keeps its own state if the Pi drops out.

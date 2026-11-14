@@ -17,8 +17,7 @@ Options considered and declined by the human on 2026-11-14: streaming Behringer'
 - Mixer control keeps working if the visuals crash or restart.
 
 ## Non-goals
-- Not a replacement for X AIR Edit: no EQ, gate, compressor, FX editing, routing, or preamp settings in v1.
-- No preamp gain or phantom power control (too easy to cause damage or feedback from a phone).
+- Not a full replacement for X AIR Edit: no FX rack editing (choosing and tweaking effect types), no input/output routing, no USB routing, no automix, no DCA or mute-group setup in v1.
 - No snapshot recall or save in v1.
 - No recording, no audio streaming to phones.
 - Other mixer families (X32 and similar) are not targeted. XR12, XR16, and MR18 may work but are not tested.
@@ -36,6 +35,19 @@ Options considered and declined by the human on 2026-11-14: streaming Behringer'
 - Phone portrait shows a scrollable row of strips with large touch targets; faders need a deliberate drag (a tap on the track does not jump the level).
 - Optional PIN: when set, the engineer page asks for it once per device. Musician pages never need it.
 
+### Channel detail (engineer only)
+Tapping a strip's name opens that channel. Required by the human on 2026-11-14: sends, preamp gain, phantom power, EQ, and dynamics.
+
+- **Preamp**: gain, phantom power (48 V), polarity invert, low-cut on/off and frequency. Shown for the 16 mic/line inputs only.
+- **Sends**: this channel's level into each of the 6 buses and the 4 FX sends, each with its own fader and mute, and the pre/post tap point. This is the per-channel view of the same sends that "sends on faders" shows per bus.
+- **EQ**: on/off, and for each band its type, frequency, gain, and width, with a drawn curve that can be dragged on a touch screen and number fields for exact values. 4 bands on input channels, 6 on buses and main LR.
+- **Gate**: on/off, mode, threshold, range, attack, hold, release, with a gain-reduction meter.
+- **Compressor**: on/off, threshold, ratio, knee, attack, hold, release, make-up gain, mix, with a gain-reduction meter.
+- Pan, and the channel's name and colour, can be edited here too.
+- Buses and main LR open the same view with the sections that apply to them (EQ, compressor, no preamp or gate).
+- Copy and paste of a channel's EQ or dynamics settings to another channel.
+- A "reset section" button on EQ, gate, and compressor, with confirmation.
+
 ### Musician page (`/mixer/me/<bus>`)
 - Shows only the sends into that musician's bus, plus the bus master level. Nothing on this page can change the main mix or another bus.
 - Each bus can be given a musician name and a maximum master level (a cap) from the engineer page.
@@ -46,6 +58,9 @@ Options considered and declined by the human on 2026-11-14: streaming Behringer'
 ### Safety
 - Fader moves sent from a page are rate-limited, and a single gesture cannot raise a level by more than a set step at once, so a slip of a thumb does not produce a jump to full.
 - Mutes on the engineer page for main LR ask for confirmation when un-muting.
+- **Phantom power** asks for confirmation on every switch, on or off, and names the channel in the question.
+- **Preamp gain** moves in small steps per gesture (no jump from a stray tap) and shows the input meter beside it while adjusting.
+- Preamp, EQ, and dynamics are engineer-only. If an engineer PIN is set it covers them; musician pages can never reach them.
 - If two people move the same control, the last move wins and both pages show the result.
 
 ## Constraints
@@ -72,8 +87,13 @@ Options considered and declined by the human on 2026-11-14: streaming Behringer'
 - [ ] AC12 — Losing the mixer disables controls and shows the state; it reconnects by itself when the mixer returns.
 - [ ] AC13 — Stopping the visuals service leaves the mixer pages working.
 - [ ] AC14 — The project verification command passes.
-- [ ] AC15 — (Human, real hardware) With the real XR18 on the venue router: discovery, faders, mutes, meters, and a musician page all work, and stay in sync with X AIR Edit on another device.
+- [ ] AC16 — Channel detail reads and writes, against the simulated mixer: preamp gain, phantom power, polarity, low-cut; every bus and FX send level, mute, and tap point; every EQ band parameter; every gate and compressor parameter listed in the spec. Values shown match the mixer's units (dB, Hz, ms, ratio).
+- [ ] AC17 — Phantom power cannot be switched without the confirmation, and a musician-page client is refused preamp, EQ, and dynamics changes by the server.
+- [ ] AC18 — The EQ curve drawn on the page matches the band settings and updates when the mixer is changed from elsewhere.
+- [ ] AC19 — Copy and paste of EQ and dynamics between channels works; reset restores the mixer's defaults for that section.
+- [ ] AC20 — Gate and compressor gain-reduction meters animate from simulated meter data.
+- [ ] AC15 — (Human, real hardware) With the real XR18 on the venue router: discovery, faders, mutes, meters, a musician page, and channel detail (gain, phantom, sends, EQ, gate, compressor) all work, and stay in sync with X AIR Edit on another device.
 
 ## Open questions
 1. **How do you run monitors?** I assumed each musician has one of the six buses (mono). If you use stereo-linked buses for in-ears, say so and the musician page will treat a linked pair as one mix.
-2. **Is an engineer PIN wanted by default**, or off unless you turn it on? Assumed off.
+2. **Is an engineer PIN wanted by default**, or off unless you turn it on? Assumed off. Now that gain and phantom power are controllable from the page, I recommend on.
