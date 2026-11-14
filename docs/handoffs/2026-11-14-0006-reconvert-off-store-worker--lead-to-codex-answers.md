@@ -4,7 +4,7 @@
 - **Type:** dispatch (answers)
 - **Ledger:** 0006 · **Original handoff:** docs/handoffs/2026-11-14-0006-reconvert-off-store-worker--lead-to-codex.md
 - **Branch:** orch/0006-reconvert-off-store-worker · **PR:** https://github.com/pepperhorn/visualz/pull/3
-- **Status:** open
+- **Status:** closed
 
 ## Answers
 1. **`visualz/__main__.py`: yes, you now own it**, for the shutdown wiring only: `register_commands(store)` may return the media worker (or a close callable), and the existing ExitStack registers its close before the Store closes. No other change to that file.

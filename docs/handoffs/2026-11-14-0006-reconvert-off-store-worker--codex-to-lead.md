@@ -8,7 +8,7 @@
 - **PR:** https://github.com/pepperhorn/visualz/pull/3 (draft)
 - **Base commit:** 5a1b569d62f48d70397c7e8627e490c079e2a88c (worktree base; implementation foundation 108ff559be065b8e77b3da644569fd3465f44c17)
 - **Port:** 5260 (no dev server started)
-- **Status:** closed (implementation complete; review pending)
+- **Status:** closed
 
 ## Goal
 Move reconversion to a serial media-owned worker, keep Store.submit responsive within 100 ms, preserve existing assets and failure status, and bound shutdown.

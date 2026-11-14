@@ -7,7 +7,7 @@
 - **PR:** —
 - **Base commit:** 108ff559be065b8e77b3da644569fd3465f44c17
 - **Port (if running a server):** 5260
-- **Status:** open
+- **Status:** closed
 
 ## Goal
 Review finding F2. `media.reconvert` (`visualz/media/__init__.py:264-278`) runs ffmpeg (up to 120 s per asset) through `store.submit_task`, which is the store's single short-lived worker. Every `Store.submit()` queued behind it waits, including `stage.blackout` (`visualz/__main__.py:81`). Measured: a 2.24 s blackout delay on a desktop. Fix: run conversions on a thread (or single-thread executor) owned by the media module, and hand only the final `store.patch` and status update to the store. Conversions stay serial (one ffmpeg at a time: the Pi 2 can't afford more). Shut the executor down cleanly on close.
