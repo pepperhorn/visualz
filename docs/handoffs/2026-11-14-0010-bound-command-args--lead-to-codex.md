@@ -48,5 +48,7 @@ None.
 ---
 ## Receiver ack
 
+I will reject oversized command arguments before enqueueing through HTTP or WebSocket, add an endpoint-specific body limit without changing upload limits, bound and coerce image metadata outside the runtime lock, and normalize size-check failures to ValueError. I will change only the six assigned code/test files and task handoffs, run the required verification, and open a draft PR on orch/0010-bound-command-args. No open questions. GBrain: unavailable.
+
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)
