@@ -35,7 +35,7 @@ T1 lands first and fixes the seams: schemas, the GL helpers, and stub modules wi
 - **Depends on:** —
 - **Route:** implement (default)
 - **Owns:** `pyproject.toml`, `ruff.toml`, `visualz/__init__.py`, `visualz/__main__.py`, `visualz/state/**`, `visualz/schema/**`, `visualz/server/**`, `visualz/media/**`, `visualz/gl/**`, stub `__init__.py` in `visualz/{audio,render,camera,overlay}/`, `web/index.html` (placeholder), `tools/smoke.py`, `tests/state/**`, `tests/schema/**`, `tests/server/**`, `tests/media/**`, `tests/conftest.py`
-- **Acceptance:** AC9, AC13 (server side), AC14, AC15, AC18; upload endpoints with type and size checks, sanitised names, image downscale, video to frame loop via ffmpeg; `python -m visualz --window` opens a window on a laptop showing a test pattern and serves the placeholder UI on `0.0.0.0`
+- **Acceptance:** AC9, AC13 (server side), AC14, AC15, AC18; upload endpoints with type and size checks, sanitised names, image downscale, logo video to frame loop and gallery clip to low-res low-fps file via ffmpeg (original kept); `python -m visualz --window` opens a window on a laptop showing a test pattern and serves the placeholder UI on `0.0.0.0`
 - **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
 - **Notes / gotchas:** the schemas are the contract for T2 to T4, so cover every field the spec names: look controls incl. halftone, palettes, theme colours, scenes, auto-cycle, picture sets incl. camera sets, overlay templates with variables. After T1 merges, other tasks may not edit `visualz/schema/**`: they request changes in their return handoff. `tools/smoke.py` is a standalone script for the real Pi: opens KMS/DRM with ES 2.0, draws an animated shader, prints fps, GL renderer string, ALSA capture devices, and video devices. Tests that need a GL context must skip cleanly when none is available. Runtime dependencies must exist as Raspberry Pi OS Bookworm apt packages: list the apt names in `pyproject.toml` comments for T5.
 
@@ -43,9 +43,9 @@ T1 lands first and fixes the seams: schemas, the GL helpers, and stub modules wi
 - **Depends on:** T1 (and a passing smoke test on the Pi)
 - **Route:** implement (default)
 - **Owns:** `visualz/audio/**`, `visualz/render/**`, `visualz/camera/**`, `tests/audio/**`, `tests/render/**`, `tests/camera/**`
-- **Acceptance:** AC1 to AC6 (stage side), AC16 (design for it; fps readout), AC19, AC20, AC21 and AC22 (stage side)
+- **Acceptance:** AC1 to AC6 (stage side), AC16 (design for it; fps readout), AC19, AC20, AC21 and AC22 (stage side), AC23 (stage side), AC24
 - **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
-- **Notes / gotchas:** GLSL ES 1.00 only, `precision mediump float` unless a mode proves it needs more; constant loop bounds of 16 or fewer; at most 2 texture reads per pixel in a mode. Render the mode to a low-res framebuffer; the post pass does palette quantise + dither + nearest upscale, or the halftone screen at output resolution. Crossfade renders two modes only during the fade. `chromascope` and `gallery` use ping-pong feedback framebuffers; the waveform goes in as a small texture (L and R rows). `gallery` holds at most two picture textures and uploads the next one ahead of the transition, off the frame it is needed. Beat detection and auto-gain are pure NumPy functions tested on synthetic buffers. Audio capture and camera capture run on threads and must never block the render loop; a missing or unplugged device degrades to idle animation, not an exception. Camera stills via a subprocess grab (ffmpeg or v4l2) so no heavy vision library is needed.
+- **Notes / gotchas:** GLSL ES 1.00 only, `precision mediump float` unless a mode proves it needs more; constant loop bounds of 16 or fewer; at most 2 texture reads per pixel in a mode. Render the mode to a low-res framebuffer; the post pass does palette quantise + dither + nearest upscale, or the halftone screen at output resolution. Crossfade renders two modes only during the fade. `chromascope` and `gallery` use ping-pong feedback framebuffers; the waveform goes in as a small texture (L and R rows). `gallery` holds at most two picture textures and uploads the next one ahead of the transition, off the frame it is needed. Beat detection and auto-gain are pure NumPy functions tested on synthetic buffers. Audio capture and camera capture run on threads and must never block the render loop; a missing or unplugged device degrades to idle animation, not an exception. Clips play through a decoder thread (for example an ffmpeg subprocess piping raw frames of the pre-converted file) into a small frame queue; the render loop only uploads the newest ready frame and never waits. Only one clip decodes at a time on a Pi 2. Camera stills via a subprocess grab (ffmpeg or v4l2) so no heavy vision library is needed.
 
 ### T3 — Overlay
 - **Depends on:** T1
@@ -59,7 +59,7 @@ T1 lands first and fixes the seams: schemas, the GL helpers, and stub modules wi
 - **Depends on:** T1
 - **Route:** implement (alt)
 - **Owns:** `web/**`, `tests/web/**`
-- **Acceptance:** control side of AC1, AC3 to AC13, AC20 to AC22; phone-portrait layout; blackout; level meter; reconnects by itself
+- **Acceptance:** control side of AC1, AC3 to AC13, AC20 to AC24; phone-portrait layout; blackout; level meter; reconnects by itself
 - **Verify:** `.venv/bin/ruff check . && .venv/bin/pytest`
 - **Notes / gotchas:** static files, no build step, no CDN: vanilla JS modules (a small vendored library is acceptable if its licence is recorded). Overlay previews come from the server preview endpoint, not from re-implementing layout in the browser. Forms are generated from the JSON Schemas where practical so new fields appear without UI work.
 
@@ -67,7 +67,7 @@ T1 lands first and fixes the seams: schemas, the GL helpers, and stub modules wi
 - **Depends on:** T1
 - **Route:** implement (default)
 - **Owns:** `deploy/**`, `docs/guides/pi-setup.md`
-- **Acceptance:** AC17; hardware notes (USB audio interfaces with line in, webcams, HDMI mode, Pi 2 networking)
+- **Acceptance:** AC17; Wi-Fi client setup for a named network at install time; hardware notes (USB audio interfaces, multichannel mixers over USB, webcams, HDMI mode, Pi 2 Wi-Fi adapter)
 - **Verify:** `shellcheck deploy/*.sh` plus the whole-item command
 - **Notes / gotchas:** Raspberry Pi OS Lite Bookworm 32-bit. Install runtime dependencies with apt, not pip. systemd unit with `Restart=always`, running as a non-root user in the `video`, `render`, `audio`, and `input` groups. Set the HDMI mode to 720p and enough GPU memory. Cannot be fully verified without hardware: the return handoff must say what was and wasn't tested.
 
@@ -78,6 +78,7 @@ T1 → human runs `tools/smoke.py` on the Pi → (T2, T3, T4, T5 in parallel, an
 - **pygame + KMS/DRM + ES 2.0 on the Pi 2/3** is unproven here. Mitigation: the smoke test gate after T1. Fallback if it fails: create the context with raw EGL/GBM bindings, contained in `visualz/gl/`.
 - **GPU performance**, especially `liquid`, `kaleido`, `gallery`, the feedback buffers, and halftone at output resolution on a Pi 2. Mitigation: internal resolution and per-mode quality settings; the halftone pass may drop to half output resolution.
 - **Shader compiler limits** on VideoCore IV differ from desktop drivers, so a shader that works on a laptop may fail on the Pi. Mitigation: strict GLSL rules in T2, and the human's hardware pass.
+- **Clip playback cost** on a Pi 2: decoding plus a texture upload every frame. Mitigation: clips are pre-converted to the internal resolution at 12 to 15 fps; the frame rate may drop further on a Pi 2.
 - **Memory**: 1 GB shared with the GPU. Mitigation: caps on picture size, picture count, and logo loop length.
 - **Hardware-only criteria** (AC16, AC17, AC21 with a real webcam) cannot be verified by agents and need a run on the user's Pi.
 - **Schema churn** after T1. Mitigation: T1 covers the full spec surface; later changes go through the lead as a quick item.

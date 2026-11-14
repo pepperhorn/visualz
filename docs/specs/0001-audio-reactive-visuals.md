@@ -27,6 +27,7 @@ The band wants projected visuals at gigs that react to the music and keep evolvi
 - No in-browser shader editor. New modes are added in code.
 - Pi Zero and Pi 1 are not supported.
 - No live webcam video on screen in v1: the camera supplies still photos only.
+- No full-resolution or long-form video playback: clips are short, low-resolution source material for the visuals, not a media player.
 
 ## User-visible behaviour
 
@@ -39,6 +40,7 @@ The band wants projected visuals at gigs that react to the music and keep evolvi
 - Input device is chosen in the control UI from the capture devices the Pi reports. The choice persists across restarts.
 - Analysis produces: overall level, bass / mid / treble energy, a spectrum, and beat onsets. All are smoothed and auto-gained so a quiet room and a loud stage both give a usable range.
 - The expected source is a stereo line feed (two line inputs) through a USB audio interface. Left and right are analysed together for levels and beats, and are also available separately so modes can use the stereo image. Mono sources work too.
+- On a multichannel device (for example a mixer that is itself a USB interface), the control UI picks which two input channels are left and right.
 - Controls: input gain, sensitivity, smoothing. A live level meter in the control UI shows the signal is arriving.
 
 ### Visual modes
@@ -61,6 +63,13 @@ Each mode is a shader with the shared audio inputs, a slow "evolution" clock so 
 - Order is sequential or shuffled; pictures are cropped to fill or fitted with a blurred fill behind.
 - This is shader-based morphing of the supplied pictures. It does not generate new imagery with an AI model (not feasible live on a Pi).
 - Pictures are downscaled on upload to a size the Pi's GPU can hold.
+
+**Video clips as source material.** A picture set can also contain video clips (WebM, MP4, or GIF), freely mixed with pictures and camera photos:
+- A clip plays on a loop while it is held, and gets exactly the same treatment as a picture: generative transitions in and out, audio-reactive warping, feedback trails, the amount control, and the pixel and halftone looks.
+- Playback options per clip: loop, ping-pong (forwards then backwards), or beat-jump (cuts to a random point in the clip on each beat). Playback speed can follow the audio level.
+- Clips are converted on upload to a small, low-frame-rate version (about the internal render resolution, 12 to 15 fps, silent) so the Pi can play them. The original file is kept so it can be re-converted. Clips longer than 60 seconds are trimmed, with a warning.
+- A clip can also be used as the source texture for `kaleido` (the kaleidoscope folds the moving image instead of a generated pattern). The same applies to any picture.
+- During a transition between two clips, the outgoing clip may freeze on its last frame on a Pi 2.
 
 **Camera as a picture source.** With a USB webcam attached, a picture set can be fed by the camera instead of uploads:
 - The camera takes a still photo every N seconds (default 30, minimum 5), or on demand from a "snap now" button.
@@ -114,6 +123,7 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 - Performance: output is 1280×720. Modes render at a low internal resolution and are upscaled (default 480×270 on a Pi 3, 320×180 on a Pi 2). At those defaults every mode holds at least 30 fps on a Pi 3 and at least 24 fps on a Pi 2. A per-mode quality setting may simplify the heavy modes on a Pi 2.
 - Stack per ADR 0002: one Python 3 program (SDL2 on KMS/DRM, OpenGL ES 2.0, ALSA capture, Pillow for text) with an embedded web server; control UI is static HTML/JS with no build step. Python dependencies must be installable from Raspberry Pi OS apt packages.
 - No network needed at the venue beyond the control device reaching the Pi. No CDN assets: fonts and libraries are bundled.
+- Network: the Pi joins an existing Wi-Fi network as a client, configured at install time. A Pi 2 needs a USB Wi-Fi adapter or Ethernet.
 - All persistent state lives in one `data/` directory (settings, scenes, overlays, uploaded assets) so it can be backed up or copied between Pis.
 - Uploads are size-limited and type-checked; file names are sanitised.
 
@@ -141,9 +151,10 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 - [ ] AC21 — With a USB webcam attached, a camera picture set fills with photos at the set interval and on "snap now", keeps only the most recent M, and `gallery` morphs through them; the latest photo shows in the control UI; with no webcam the app runs normally.
 - [ ] AC22 — Camera photos are not written to disk unless the save setting is on, and "delete all camera photos" removes them.
 
-## Open questions
-Answered 2026-11-14: hardware is a Pi 2 or 3; audio is two line inputs through a USB interface; the renderer is native (ADR 0002).
+- [ ] AC23 — An uploaded WebM, MP4, and GIF each convert and play as a looping clip inside `gallery` with transitions, audio reaction, and looks applied; loop, ping-pong, and beat-jump all work; a clip or picture can be chosen as the source for `kaleido`.
+- [ ] AC24 — On a multichannel audio device, the chosen two channels drive the visuals.
 
-1. **Audio interface**: the USB device needs line *inputs*. A box sold as a "DAC" is often output-only, so check yours has a line-in / ADC. Deferred: hardware check by the human.
-2. **Venue network**: is there usually Wi-Fi the Pi and your phone can share? If not, a follow-up item can make the Pi its own hotspot (deferred, not in v1; the Pi 2 has no built-in Wi-Fi and would need a USB dongle or Ethernet).
-3. **Licence** for the public repo (MIT suggested). Deferred until you say.
+## Open questions
+Answered 2026-11-14: hardware is a Pi 2 or 3; audio is two line inputs through a class-compliant USB interface; the renderer is native (ADR 0002); the Pi joins the venue Wi-Fi router already used for the audio desk, so no hotspot is needed.
+
+1. **Licence** for the public repo (MIT suggested). Deferred until you say.
