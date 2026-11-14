@@ -38,7 +38,7 @@ The band wants projected visuals at gigs that react to the music and keep evolvi
 - Controls: input gain, sensitivity, smoothing. A live level meter in the control UI shows the signal is arriving.
 
 ### Visual modes
-Each mode is a shader with the shared audio inputs, a slow "evolution" clock so it never loops visibly, and a small set of its own parameters. v1 ships these six, matching the reference images:
+Each mode is a shader with the shared audio inputs, a slow "evolution" clock so it never loops visibly, and a small set of its own parameters. v1 ships these eight:
 
 | Mode | Look |
 |---|---|
@@ -48,9 +48,19 @@ Each mode is a shader with the shared audio inputs, a slow "evolution" clock so 
 | `liquid` | Oil-and-water liquid light show: drifting blobs and bubbles, lens-like colour |
 | `opart` | High-contrast warped moiré / illusion pattern |
 | `plasma` | Classic demoscene plasma and tunnel, the simplest all-purpose mode |
+| `chromascope` | Analogue video-synth look: glowing, feedback-trailed ribbons and Lissajous-style figures drawn directly from the audio waveform, with drifting colour |
+| `gallery` | Morphs generatively through a set of uploaded pictures (see below) |
+
+**Gallery mode.** The user uploads a set of pictures (JPEG/PNG/WebP) into one or more named picture sets. The mode shows them as living images rather than a slideshow:
+- Moves from one picture to the next with a generative transition, chosen per set or at random: flow-warp melt, pixel-sort smear, kaleidoscope fold, luminance dissolve, or feedback bloom. Transitions are triggered by time, by beats, or manually.
+- While a picture is held, it is never static: audio drives slow warping, zoom-breathing, colour shifting, and feedback trails. An amount control goes from "nearly a clean photo" to "barely recognisable".
+- Order is sequential or shuffled; pictures are cropped to fill or fitted with a blurred fill behind.
+- This is shader-based morphing of the supplied pictures. It does not generate new imagery with an AI model (not feasible live on a Pi).
+- Pictures are downscaled on upload to a size the Pi's GPU can hold.
 
 Global look controls, applied to every mode:
 - **Pixel size** (1 = off, up to chunky blocks), **colour depth** (full, or quantised to a palette of 4 to 256 colours), **dither** on/off.
+- **Halftone**: renders the image as a print-style dot screen. Controls: dot size, screen angle, shape (dot, line, diamond), and style (mono ink on paper colour, duotone from the palette, or CMYK with offset screen angles). Dot size can pulse with the audio. Halftone and pixel are alternatives: one is active at a time.
 - **Palette**: a set of built-in palettes plus custom palettes (a list of hex colours) editable in the UI.
 - Brightness, contrast, saturation, speed, audio-reactivity amount.
 
@@ -75,7 +85,7 @@ Behaviour:
 - The first run ships three example templates: logo bug only, lower-third (band + song), and full title card.
 
 ### Control UI (`/control`)
-Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, now-playing, blackout), Look, Audio, Overlays (template editor), Scenes, Assets (logo, video, and font uploads), System (stage resolution, restart stage, show the Pi's address).
+Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, now-playing, blackout), Look, Audio, Overlays (template editor), Scenes, Assets (logo, video, font, and picture-set uploads), System (stage resolution, restart stage, show the Pi's address).
 - Changes apply to the stage within 100 ms and are saved automatically.
 - **Blackout** button: fades the stage to black (overlay optional) and back.
 - Two control devices open at once stay in sync.
@@ -96,8 +106,8 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 ## Acceptance criteria
 - [ ] AC1 — With a USB audio input selected, the control UI level meter moves with sound, and every mode visibly responds to bass, treble, and beats.
 - [ ] AC2 — With no audio device or silence, every mode keeps animating.
-- [ ] AC3 — All six modes render, can be selected from the UI, and crossfade on switch.
-- [ ] AC4 — Pixel size, colour depth, dither, and palette apply to every mode; a custom palette can be created and used.
+- [ ] AC3 — All eight modes render, can be selected from the UI, and crossfade on switch.
+- [ ] AC4 — Pixel size, colour depth, dither, halftone (all three styles), and palette apply to every mode; a custom palette can be created and used.
 - [ ] AC5 — Auto-cycle rotates through the selected modes by time and by beats.
 - [ ] AC6 — A scene can be saved, survives a restart, and recalls mode, parameters, and look.
 - [ ] AC7 — An image logo and a looping video logo each display in the chosen corner at the chosen size and opacity.
@@ -112,6 +122,8 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 - [ ] AC16 — On a Pi 4 at 720p, each mode holds at least 30 fps at default settings (measured with the built-in fps readout).
 - [ ] AC17 — The install script on a fresh Raspberry Pi OS desktop image results in the stage on HDMI after reboot, with audio capture working and no permission prompt.
 - [ ] AC18 — `npm run lint && npm test && npm run build` passes.
+- [ ] AC19 — `chromascope` draws figures that follow the live waveform and leave fading trails.
+- [ ] AC20 — With a picture set of at least three uploaded images, `gallery` moves through them with generative transitions (by time, by beats, and manually), each held picture reacts to audio, and the amount control visibly ranges from near-clean to heavily abstracted.
 
 ## Open questions
 1. **Which Pi?** Assumed Pi 4 (4 GB) or Pi 5. Confirm, or say which model you have.
