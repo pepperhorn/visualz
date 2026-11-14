@@ -10,6 +10,9 @@ from visualz.schema.profiles import profile_defaults
 import re
 import shutil
 import subprocess
+import time
+from queue import Queue
+from threading import Condition, Event, Thread, local
 from io import BytesIO
 from pathlib import Path
 from uuid import uuid4
@@ -19,6 +22,38 @@ from PIL import Image, ImageFont, UnidentifiedImageError
 
 MAX_UPLOAD = 64 * 1024 * 1024
 MAX_TEXTURE = 2048
+_conversion = local()
+_STOP = object()
+
+
+def _check_cancelled():
+    cancel = getattr(_conversion, "cancel", None)
+    if cancel is not None and cancel.is_set():
+        raise ValueError("Media conversion cancelled on shutdown")
+
+
+def _run_process(args, *, timeout):
+    """Keep ordinary ingest synchronous; worker subprocesses can be cancelled."""
+    if getattr(_conversion, "cancel", None) is None:
+        return subprocess.run(args, capture_output=True, timeout=timeout)
+    _check_cancelled()
+    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE) as process:
+        deadline = time.monotonic() + timeout
+        try:
+            while True:
+                _check_cancelled()
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(args, timeout)
+                try:
+                    stdout, stderr = process.communicate(timeout=min(0.1, remaining))
+                    return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+                except subprocess.TimeoutExpired:
+                    pass
+        except BaseException:
+            process.kill()
+            process.communicate()
+            raise
 
 
 def safe_name(name):
@@ -32,7 +67,7 @@ def run_ffmpeg(args):
     if not shutil.which("ffmpeg"):
         raise ValueError("ffmpeg is required for video conversion")
     try:
-        result = subprocess.run(
+        result = _run_process(
             [
                 "nice",
                 "-n",
@@ -49,7 +84,6 @@ def run_ffmpeg(args):
                 "1",
                 args[-1],
             ],
-            capture_output=True,
             timeout=120,
         )
     except subprocess.TimeoutExpired as exc:
@@ -75,6 +109,7 @@ def ingest(
     picture_size=None,
 ):
     """Validate bytes and return asset metadata; failures remove partial outputs."""
+    _check_cancelled()
     options = profile_defaults(profile)
     clip_size = tuple(clip_size or options["clip_size"])
     clip_fps = options["clip_fps"] if clip_fps is None else clip_fps
@@ -103,9 +138,9 @@ def ingest(
     directory.mkdir(parents=True)
     name = safe_name(filename)
     original = directory / ("original-" + name)
-    original.write_bytes(content)
     warnings = []
     try:
+        original.write_bytes(content)
         suffix = Path(name).suffix.lower()
         if kind == "font":
             if suffix not in (".ttf", ".otf") or content[:4] not in (
@@ -153,7 +188,7 @@ def ingest(
             # Probe content before conversion; a suffix alone never establishes type.
             if not shutil.which("ffprobe"):
                 raise ValueError("ffprobe is required for video conversion")
-            probe = subprocess.run(
+            probe = _run_process(
                 [
                     "ffprobe",
                     "-v",
@@ -164,7 +199,6 @@ def ingest(
                     "json",
                     str(original),
                 ],
-                capture_output=True,
                 timeout=20,
             )
             if probe.returncode:
@@ -219,6 +253,7 @@ def ingest(
                 output.write_text(
                     json.dumps(dict(fps=logo_fps, duration=len(frames) / logo_fps, frames=frames))
                 )
+        _check_cancelled()
         return dict(
             id=asset_id,
             path=output.relative_to(root).as_posix(),
@@ -253,29 +288,84 @@ def reconvert(data_dir, asset, **limits):
     return ingest(data_dir, asset["name"], original.read_bytes(), asset["kind"], **limits)
 
 
-def register_commands(store):
-    """Register a short media.reconvert(asset_id) handler that queues background work.
+class ReconvertWorker:
+    """One conversion at a time, independent of the store's short-job queue.
 
-    Result acknowledgement says queued; final metadata/error is status.media.
-    No references are switched automatically: T4 may apply regenerated_asset.
+    close cancels queued jobs and subprocesses, waiting at most two seconds.
+    The daemon fallback covers uninterruptible Python/native image operations;
+    late outputs are discarded. Abrupt exit may leave an unregistered UUID
+    directory, but never modifies the old asset or takes partial output live.
     """
-    from visualz.schema.profiles import media_options
 
-    def reconvert_command(asset_id):
-        def work():
-            try:
-                asset = store.get()["assets"][asset_id]
-                result = reconvert(
-                    store.data_dir,
-                    asset,
-                    **media_options(store.snapshot()["settings"], store.runtime),
-                )
-                store.patch({"assets": {result["id"]: result}})
-                store.runtime.publish_status("media", {"regenerated_asset": result, "error": None})
-            except Exception as exc:
-                store.runtime.publish_status("media", {"error": str(exc)})
+    def __init__(self, store):
+        self.store = store
+        self._jobs = Queue()
+        self._cancel = Event()
+        self._idle = Condition()
+        self._pending = 0
+        self._thread = Thread(target=self._run, name="media-reconvert", daemon=True)
+        self._thread.start()
 
-        store.submit_task(work)
+    def submit(self, asset_id):
+        with self._idle:
+            if self._cancel.is_set():
+                raise RuntimeError("Media worker is closed")
+            self._pending += 1
+            self._jobs.put_nowait(asset_id)
         return {"queued": True, "asset_id": asset_id}
 
-    store.runtime.register_command("media", "reconvert", reconvert_command)
+    def wait_idle(self, timeout=None):
+        """Wait for all accepted jobs, including metadata/status publication."""
+        with self._idle:
+            return self._idle.wait_for(lambda: self._pending == 0, timeout)
+
+    def close(self):
+        with self._idle:
+            if not self._cancel.is_set():
+                self._cancel.set()
+                self._jobs.put_nowait(_STOP)
+        self._thread.join(timeout=2)
+
+    def _run(self):
+        from visualz.schema.profiles import media_options
+
+        _conversion.cancel = self._cancel
+        while True:
+            asset_id = self._jobs.get()
+            if asset_id is _STOP:
+                return
+            result = None
+            registered = False
+            try:
+                _check_cancelled()
+                asset = self.store.get()["assets"][asset_id]
+                result = reconvert(
+                    self.store.data_dir,
+                    asset,
+                    **media_options(self.store.snapshot()["settings"], self.store.runtime),
+                )
+                _check_cancelled()
+                self.store.patch({"assets": {result["id"]: result}})
+                registered = True
+                self.store.runtime.publish_status(
+                    "media", {"regenerated_asset": result, "error": None}
+                )
+            except Exception as exc:
+                if result is not None and not registered:
+                    shutil.rmtree(self.store.data_dir / "assets" / result["id"], ignore_errors=True)
+                self.store.runtime.publish_status("media", {"error": str(exc)})
+            finally:
+                with self._idle:
+                    self._pending -= 1
+                    self._idle.notify_all()
+
+
+def register_commands(store):
+    """Register media.reconvert and return its worker; caller must close it.
+
+    Acknowledgement says queued; final metadata/error is status.media.
+    References are never switched automatically: T4 may apply regenerated_asset.
+    """
+    worker = ReconvertWorker(store)
+    store.runtime.register_command("media", "reconvert", worker.submit)
+    return worker

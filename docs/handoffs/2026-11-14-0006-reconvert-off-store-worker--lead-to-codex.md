@@ -43,5 +43,7 @@ None.
 
 Acknowledged: move reconversion to a serial media-owned worker so Store.submit remains responsive; preserve fresh-directory conversion and failure reporting, and bound shutdown. I will change only the listed media files, new reconversion tests, and my handoffs. No open questions. GBrain: unavailable.
 
+Continuation acknowledged: read the scope answers at commit e93f769372c11927b29f4f3be2c2142b58081564 (`docs/handoffs/2026-11-14-0006-reconvert-off-store-worker--lead-to-codex-answers.md`). Ownership now includes shutdown wiring only in `visualz/__main__.py` and completion-wait changes only in `test_r2_2_auto_resolution_and_registered_reconvert`. Use Python 3.11 venv directly and expose public media-worker wait-for-idle. Both scope blockers are resolved.
+
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)

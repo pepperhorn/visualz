@@ -75,12 +75,13 @@ def test_r2_2_auto_resolution_and_registered_reconvert(tmp_path):
     assert media_options(store.snapshot()["settings"], store.runtime)["picture_size"] == 2048
     store.runtime.publish_status("stage", {"hardware_profile": "high"})
     assert media_options(store.snapshot()["settings"], store.runtime)["picture_size"] == 4096
-    register_commands(store)
+    media = register_commands(store)
     store.runtime.enqueue_command(
         {"target": "media", "name": "reconvert", "args": {"asset_id": original["id"]}}
     )
     store.runtime.drain_commands()
-    store._pending.join()
+    assert media.wait_idle(timeout=5)
+    media.close()
     regenerated = store.runtime.status()["media"]["regenerated_asset"]
     assert Image.open(tmp_path / regenerated["path"]).width == 4096
     assert regenerated["id"] in store.get()["assets"]
