@@ -20,7 +20,42 @@ class JsonCoercer:
         except Exception:
             return f"<{type(value).__module__}.{type(value).__name__}>"
 
-    def __call__(self, value, key="status", _seen=None):
+    def _check_size(self, value, key, remaining, seen):
+        """Bound aggregate sequence slots before allocating converted arrays."""
+        if id(value) in seen:
+            return
+        seen.add(id(value))
+        try:
+            if isinstance(value, dict):
+                children = (
+                    (v, f"{key}.{k}" if isinstance(k, (str, int, float, bool)) else key + ".<key>")
+                    for k, v in value.items()
+                )
+            elif isinstance(value, (list, tuple, set, frozenset)):
+                remaining[0] -= len(value)
+                children = ((v, f"{key}[]") for v in value)
+            elif type(value).__module__.split(".")[0] == "numpy":
+                remaining[0] -= int(getattr(value, "size", 1))
+                # Object arrays can themselves contain sequences or arrays.
+                children = (
+                    ((v, f"{key}[]") for v in value.flat)
+                    if getattr(getattr(value, "dtype", None), "hasobject", False)
+                    and hasattr(value, "flat")
+                    else ()
+                )
+            else:
+                return
+            if remaining[0] < 0:
+                raise ValueError(f"{key} exceeds the {remaining[1]} element status limit")
+            for child, child_key in children:
+                self._check_size(child, child_key, remaining, seen)
+        finally:
+            seen.remove(id(value))
+
+    def __call__(self, value, key="status", _seen=None, *, max_elements=None):
+        # Opt-in at publication only: defensive send-time coercion stays tolerant.
+        if max_elements is not None:
+            self._check_size(value, key, [max_elements, max_elements], set())
         seen = set() if _seen is None else _seen
         if value is None or isinstance(value, (str, bool, int)):
             return value

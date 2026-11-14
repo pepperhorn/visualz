@@ -20,6 +20,10 @@ media.reconvert(asset_id), overlays.reload().
 T2 replaces neutral audio/camera/gallery handlers by registering the same names.
 
 publish_status(target, dict) merges volatile fields; status() returns a copy.
+Coercion runs before taking the runtime lock. MAX_STATUS_ELEMENTS (4096) bounds the
+total array elements and sequence slots in each update (including nested
+containers); oversized updates raise ValueError naming the key and limit,
+without changing prior status. NumPy sizes are checked before tolist().
 Audio: devices [{id,name,channels}] (actual capture channels, not configured stereo),
 levels {level,left,right,bass,mid,treble,beat}. Camera: present, devices, latest
 (image endpoint name or null). Stage: fps, gl_renderer, hardware_profile (detected
@@ -38,6 +42,9 @@ from inspect import signature
 from queue import Empty, Full, Queue
 from threading import RLock
 import re
+
+
+MAX_STATUS_ELEMENTS = 4096
 
 
 class CommandQueueFull(ValueError):
@@ -152,8 +159,9 @@ class Runtime:
     def publish_status(self, target, values):
         if not isinstance(values, dict):
             raise ValueError("Status must be an object")
+        values = self.coerce(values, str(target), max_elements=MAX_STATUS_ELEMENTS)
         with self._lock:
-            self._status.setdefault(target, {}).update(self.coerce(values, str(target)))
+            self._status.setdefault(target, {}).update(values)
 
     def status(self):
         with self._lock:
