@@ -53,5 +53,6 @@ T1 and T2 in parallel → T3 → human runs AC10.
 ## Risks
 - **USB bus contention** on a Pi 2/3 (mixer, drive, webcam, Wi-Fi adapter on one USB 2.0 bus) causing dropouts at 18 tracks. Mitigation: buffer, priority, AC10 measured with and without the webcam; fallback is fewer tracks or 16-bit.
 - **Shared capture** adds a layer between the device and both programs; a wrong configuration shows up as no audio in the visuals. Mitigation: T2's manual test and a check in the smoke script.
+- **Filesystem speed**: an existing Pi recorder project reports overruns at 32 tracks on anything but XFS. Mitigation: the speed check on drive selection, the ext4/XFS recommendation, and AC10 run on the band's actual drive.
 - **Drive power**: bus-powered hard disks can brown out a Pi 2/3. Mitigation: setup guide recommends an SSD or stick, or a powered hub.
 - **No real hardware in development**: everything is verified against a simulated source. AC10 is the real test and should be done at a rehearsal before any gig is relied on.

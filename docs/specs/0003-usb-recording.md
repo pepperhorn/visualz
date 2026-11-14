@@ -41,6 +41,7 @@ The Pi is already connected to the XR18 by USB and receives all of the mixer's c
 
 ### Drive
 - The page shows drives plugged in, their free space, and their format. exFAT, ext4, and FAT32 are accepted; long multitrack files are split under the hood where a format limits file size, and the split is seamless (sample-accurate, documented in the take's text file).
+- For high track counts the page recommends a Linux-native format (ext4 or XFS) and offers to format a drive that way, with a clear warning that it erases the drive and that such a drive is not readable on Windows or macOS without extra software. For that case the recorder can share the takes folder over the network so files can be copied off from any computer.
 - Recording refuses to start, with a clear reason, if no drive is present or the drive is too slow or too full for the armed track count (a short speed check runs when a drive is first selected).
 - **Eject** button flushes and unmounts the drive so it can be pulled safely. Pulling the drive during a take stops the take cleanly at the last flushed point and shows an error.
 - A low-space warning at 10 minutes remaining; recording stops cleanly before the drive is full.
@@ -72,6 +73,9 @@ The Pi is already connected to the XR18 by USB and receives all of the mixer's c
 - [ ] AC10 — (Human, real hardware) On the Pi 2 or 3 with the XR18: a 60-minute, 18-track take to the band's USB drive with the visuals running completes with zero dropouts; repeated with the webcam attached. Results recorded in the ledger.
 - [ ] AC11 — Stopping or crashing the visuals service does not interrupt a take.
 - [ ] AC12 — The project verification command passes.
+
+## References (read for ideas and evidence only; do not copy code)
+- `jajito/X32-Recorder` (Python, no licence): a Pi 4 recording 32 tracks from an X32 with no overruns using sox, W64/CAF files, and an XFS-formatted stick. Its author reports overruns with other formats, which is the evidence behind the format recommendation above. It builds on Peter Dikant's XR18-on-Pi recorder (https://dikant.de/2018/02/28/raspberry-xr18-recorder/).
 
 ## Open questions
 1. **File layout for multitrack**: I assumed one mono WAV per track, which every DAW imports directly. The alternative is a single multichannel file per take. Say if you prefer that.
