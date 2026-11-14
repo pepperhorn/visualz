@@ -40,6 +40,7 @@ None.
 
 ---
 ## Receiver ack
+I will coerce status updates before acquiring the runtime lock, reject arrays and nested sequences exceeding a named 4096-element total bound with a key-specific ValueError, and preserve prior status on rejection. I will test fast frame rejection, accepted spectra, and concurrent status/command access during blocked coercion, while preserving defensive send-time coercion and telemetry supervision. Only the three assigned code/test files and the two task handoffs will change. No open questions. GBrain: unavailable.
 
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)
