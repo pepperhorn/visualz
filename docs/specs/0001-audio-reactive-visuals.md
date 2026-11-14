@@ -39,7 +39,7 @@ The band wants projected visuals at gigs that react to the music and keep evolvi
 ### Audio
 - Input device is chosen in the control UI from the capture devices the Pi reports. The choice persists across restarts.
 - Analysis produces: overall level, bass / mid / treble energy, a spectrum, and beat onsets. All are smoothed and auto-gained so a quiet room and a loud stage both give a usable range.
-- The expected source is a stereo line feed (two line inputs) through a USB audio interface. Left and right are analysed together for levels and beats, and are also available separately so modes can use the stereo image. Mono sources work too.
+- The expected source is the band's Behringer XR18 mixer connected to the Pi by USB (it is a class-compliant multichannel interface), using two of its USB send channels as left and right. Any other class-compliant USB interface with a stereo line feed works the same way. Left and right are analysed together for levels and beats, and are also available separately so modes can use the stereo image. Mono sources work too.
 - On a multichannel device (for example a mixer that is itself a USB interface), the control UI picks which two input channels are left and right.
 - Controls: input gain, sensitivity, smoothing. A live level meter in the control UI shows the signal is arriving.
 
@@ -157,4 +157,4 @@ Works on a phone in portrait. Sections: Live (mode, auto-cycle, overlay slides, 
 ## Open questions
 Answered 2026-11-14: hardware is a Pi 2 or 3; audio is two line inputs through a class-compliant USB interface; the renderer is native (ADR 0002); the Pi joins the venue Wi-Fi router already used for the audio desk, so no hotspot is needed.
 
-1. **Licence** for the public repo (MIT suggested). Deferred until you say.
+None. Licence is MIT (human, 2026-11-14).

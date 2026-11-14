@@ -12,3 +12,5 @@ Audio-reactive generative visuals for live band shows, built to run on a Raspber
 Status: in design. See [docs/specs/0001-audio-reactive-visuals.md](docs/specs/0001-audio-reactive-visuals.md).
 
 Agents working in this repo: read [AGENTS.md](AGENTS.md) first.
+
+Licence: MIT.
