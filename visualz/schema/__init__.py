@@ -10,22 +10,23 @@ from importlib.resources import files
 
 from jsonschema import Draft202012Validator
 
-NAMES = ("settings", "scene", "overlay", "picture_set", "now_playing", "asset")
+NAMES = ("settings", "scene", "overlay", "picture_set", "now_playing", "asset", "logo_loop")
 SCHEMAS = {
     name: json.loads(files(__package__).joinpath(f"{name}.json").read_text()) for name in NAMES
 }
 
+VALIDATORS = {name: Draft202012Validator(schema) for name, schema in SCHEMAS.items()}
+_DEFAULTS = json.loads(files(__package__).joinpath("defaults.json").read_text())
+
 
 def defaults():
     """Return an independent first-run state."""
-    return json.loads(files(__package__).joinpath("defaults.json").read_text())
+    return deepcopy(_DEFAULTS)
 
 
 def validate(name, value):
     """Raise ValueError with readable paths; return an independent valid value."""
-    errors = sorted(
-        Draft202012Validator(SCHEMAS[name]).iter_errors(value), key=lambda e: str(list(e.path))
-    )
+    errors = sorted(VALIDATORS[name].iter_errors(value), key=lambda e: str(list(e.path)))
     if errors:
         raise ValueError(
             "; ".join(f"{name}.{'.'.join(map(str, e.path))}: {e.message}" for e in errors)

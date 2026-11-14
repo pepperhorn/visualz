@@ -47,34 +47,8 @@
       "additionalProperties": false
     },
     "mode": {
-      "enum": [
-        "pixel-eye",
-        "kaleido",
-        "prism",
-        "liquid",
-        "opart",
-        "plasma",
-        "chromascope",
-        "gallery"
-      ]
-    },
-    "mode_params": {
-      "type": "object",
-      "additionalProperties": {
-        "type": [
-          "number",
-          "string",
-          "boolean",
-          "null"
-        ]
-      }
-    },
-    "quality": {
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ]
+      "type": "string",
+      "minLength": 1
     },
     "look": {
       "type": "object",
@@ -208,7 +182,7 @@
         "type": "array",
         "items": {
           "type": "string",
-          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
         },
         "minItems": 4,
         "maxItems": 256
@@ -219,19 +193,19 @@
       "properties": {
         "primary": {
           "type": "string",
-          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
         },
         "accent": {
           "type": "string",
-          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
         },
         "text": {
           "type": "string",
-          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
         },
         "background": {
           "type": "string",
-          "pattern": "^(#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?|@(primary|accent|text|background))$"
+          "pattern": "^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$"
         }
       },
       "required": [
@@ -256,16 +230,8 @@
         "modes": {
           "type": "array",
           "items": {
-            "enum": [
-              "pixel-eye",
-              "kaleido",
-              "prism",
-              "liquid",
-              "opart",
-              "plasma",
-              "chromascope",
-              "gallery"
-            ]
+            "type": "string",
+            "minLength": 1
           },
           "minItems": 1,
           "uniqueItems": true
@@ -365,13 +331,45 @@
         "fade_seconds"
       ],
       "additionalProperties": false
+    },
+    "modes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "params",
+          "quality"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "params": {
+            "type": "object"
+          },
+          "quality": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        }
+      }
+    },
+    "hardware_profile": {
+      "enum": [
+        "auto",
+        "low",
+        "high"
+      ]
     }
   },
   "required": [
     "audio",
     "mode",
-    "mode_params",
-    "quality",
     "look",
     "palettes",
     "theme",
@@ -380,7 +378,9 @@
     "stage",
     "source_asset",
     "picture_set",
-    "blackout"
+    "blackout",
+    "modes",
+    "hardware_profile"
   ],
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema"

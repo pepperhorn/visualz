@@ -5,7 +5,9 @@ import signal
 import sys
 import time
 from contextlib import ExitStack
-from threading import Lock
+import socket
+import subprocess
+import ctypes
 
 from visualz.audio import Analyser
 from visualz.camera import Worker
@@ -47,6 +49,8 @@ def main():
         with ExitStack() as cleanup:
             store = Store(args.data_dir)
             cleanup.callback(store.close)
+            runtime = store.runtime
+            runtime.publish_status("stage", {"hardware_profile": None})
             audio, camera = Analyser(store), Worker(store)
             for worker in (audio, camera):
                 cleanup.callback(worker.close)
@@ -58,33 +62,84 @@ def main():
             cleanup.callback(engine.close)
             overlay = Overlay(context, args.data_dir)
             cleanup.callback(overlay.close)
-            status_lock = Lock()
-            status = {"fps": 0, "devices": []}
+            restart_requested = False
 
-            def telemetry():
-                with status_lock:
-                    return {"audio": dict(audio.snapshot()), "stage": dict(status)}
+            def restart():
+                nonlocal stopped, restart_requested
+                stopped, restart_requested = True, True
 
-            server = Server(store, args.port, telemetry)
+            def blackout(enabled, overlay=False, fade_seconds=0.5):
+                if (
+                    not isinstance(enabled, bool)
+                    or not isinstance(overlay, bool)
+                    or not isinstance(fade_seconds, (float, int))
+                    or not 0 <= fade_seconds <= 10
+                ):
+                    raise ValueError("Invalid blackout arguments")
+                store.submit(
+                    {
+                        "settings": {
+                            "blackout": dict(
+                                enabled=enabled, overlay=overlay, fade_seconds=fade_seconds
+                            )
+                        }
+                    }
+                )
+
+            runtime.register_command("stage", "restart", restart)
+            runtime.register_command("stage", "blackout", blackout)
+            hostname = socket.gethostname()
+            try:
+                result = subprocess.run(
+                    ["hostname", "-I"], capture_output=True, text=True, timeout=2
+                )
+                addresses = sorted(set(result.stdout.split())) if result.returncode == 0 else []
+                if not addresses:
+                    addresses = sorted(
+                        {entry[4][0] for entry in socket.getaddrinfo(hostname, None)}
+                    )
+            except (OSError, subprocess.TimeoutExpired):
+                addresses = []
+            from visualz.gl import api
+
+            renderer = ctypes.cast(api().glGetString(api().GL_RENDERER), ctypes.c_char_p).value
+            runtime.publish_status(
+                "stage",
+                dict(
+                    fps=0,
+                    gl_renderer=renderer.decode() if renderer else "unknown",
+                    requested_profile=store.snapshot()["settings"]["hardware_profile"],
+                    resolution=list(context.size),
+                    hostname=hostname,
+                    ip_addresses=addresses,
+                ),
+            )
+            server = Server(store, args.port)
             cleanup.callback(server.close)
             server.start()
             print(f"Control: http://0.0.0.0:{args.port}/control", flush=True)
             last, count = time.monotonic(), 0
             while not stopped and context.running():
                 now = time.monotonic()
+                runtime.drain_commands()
                 snapshot = store.snapshot()
                 engine.draw(snapshot, audio.snapshot(), now)
                 overlay.draw(snapshot, now)
                 context.swap()
                 count += 1
                 if now - last >= 1:
-                    with status_lock:
-                        status["fps"] = count / (now - last)
+                    runtime.publish_status(
+                        "stage",
+                        {
+                            "fps": count / (now - last),
+                            "requested_profile": snapshot["settings"]["hardware_profile"],
+                        },
+                    )
                     last, count = now, 0
     except Exception as exc:
         print(f"visualz: {exc}", file=sys.stderr)
         return 1
-    return 0
+    return 1 if restart_requested else 0
 
 
 if __name__ == "__main__":

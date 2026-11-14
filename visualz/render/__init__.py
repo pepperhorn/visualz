@@ -18,6 +18,8 @@ class Engine:
     def __init__(self, context, store, audio, camera):
         self.context, self.store, self.audio, self.camera = context, store, audio, camera
         self.program, self.quad = Program(PATTERN), Quad()
+        store.runtime.register_command("gallery", "next", self.next)
+        store.runtime.register_command("gallery", "prev", self.prev)
 
     def draw(self, state, audio_frame, now):
         gl = api()
@@ -32,3 +34,11 @@ class Engine:
     def close(self):
         self.quad.close()
         self.program.close()
+
+    def next(self):
+        """T2: request the next gallery source without waiting for decoding."""
+        pass
+
+    def prev(self):
+        """T2: request the previous gallery source without waiting for decoding."""
+        pass

@@ -12,6 +12,19 @@ class Analyser:
 
     def __init__(self, store):
         self.store = store
+        self.runtime = store.runtime
+        self.runtime.register_command("audio", "refresh_devices", self.refresh_devices)
+        self.runtime.publish_status(
+            "audio",
+            {
+                "devices": self.devices(),
+                "levels": {
+                    k: v
+                    for k, v in self.snapshot().items()
+                    if k not in ("spectrum", "waveform_left", "waveform_right")
+                },
+            },
+        )
 
     def start(self):
         pass
@@ -37,3 +50,7 @@ class Analyser:
 
     def close(self):
         pass
+
+    def refresh_devices(self):
+        """T2 queues re-enumeration and publishes actual channel counts to runtime."""
+        self.runtime.publish_status("audio", {"devices": self.devices()})

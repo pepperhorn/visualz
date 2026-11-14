@@ -7,55 +7,40 @@ PATCH merges, DELETE removes. POST /api/overlays/{id}/live takes a slide live;
 /api/overlays/{next,prev,clear,order} manages the slide list. Scene /{id}/live
 recalls it. POST /api/assets?kind=image|logo|clip|font accepts a multipart file.
 Overlay /{id}/export returns a ZIP; POST /api/overlays/import imports ZIP bytes.
+Worker API: POST /api/stage/command {target,name,args}; GET /api/stage/status;
+GET /api/stage/image/<name>. WS {type:command,target,name,args} uses the same
+queue. See visualz.state.runtime for the initial command/status contract.
 """
 
 import asyncio
 import json
 import sysconfig
 import threading
+import shutil
 from io import BytesIO
-from pathlib import Path, PurePosixPath
-from uuid import uuid4
+from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
 from aiohttp import WSMsgType, web
 
 from visualz import overlay
 from visualz.media import MAX_UPLOAD, ingest
+from visualz.media.archive import (
+    checked_path,
+    references as asset_refs,
+    import_archive,
+    loop_manifest,
+)
 from visualz.schema import SCHEMAS, validate
 from visualz.state import COLLECTIONS, merge
-
-
-def asset_refs(value):
-    if isinstance(value, str) and value.startswith("assets/"):
-        return {value}
-    if isinstance(value, dict):
-        return set().union(set(), *(asset_refs(v) for v in value.values()))
-    if isinstance(value, list):
-        return set().union(set(), *(asset_refs(v) for v in value))
-    return set()
-
-
-def checked_path(root, name):
-    path = PurePosixPath(name)
-    if (
-        path.is_absolute()
-        or ".." in path.parts
-        or "\\" in name
-        or not path.parts
-        or path.parts[0] != "assets"
-    ):
-        raise ValueError("Invalid asset path")
-    result = (root / name).resolve()
-    if not result.is_relative_to((root / "assets").resolve()):
-        raise ValueError("Asset path escapes data directory")
-    return result
 
 
 @web.middleware
 async def errors(request, handler):
     try:
         return await handler(request)
+    except FileNotFoundError as exc:
+        raise web.HTTPNotFound(text="Asset file not found") from exc
     except (ValueError, KeyError, TypeError, BadZipFile) as exc:
         return web.json_response({"error": str(exc)}, status=400)
 
@@ -64,36 +49,40 @@ def create_app(store, telemetry=None, web_dir=None):
     """Build app; optional telemetry() returns JSON-safe audio/stage status."""
     app = web.Application(client_max_size=MAX_UPLOAD, middlewares=[errors])
     clients = set()
-    telemetry = telemetry or (lambda: {"audio": {}, "stage": {"fps": 0, "devices": []}})
+    telemetry = telemetry or store.runtime.status
     root = store.data_dir
 
-    async def broadcast(state):
-        message = {"type": "state", "state": state}
-        for ws in tuple(clients):
-            try:
-                await ws.send_json(message)
-            except (ConnectionError, RuntimeError):
-                clients.discard(ws)
+    async def send(ws, message):
+        try:
+            await asyncio.wait_for(ws.send_json(message), 0.5)
+        except (ConnectionError, RuntimeError, asyncio.TimeoutError):
+            clients.discard(ws)
+            asyncio.create_task(ws.close())
+
+    async def broadcast(message):
+        await asyncio.gather(*(send(ws, message) for ws in tuple(clients)))
 
     async def lifecycle(app):
         loop = asyncio.get_running_loop()
-        queue = asyncio.Queue()
-        unsubscribe = store.subscribe(
-            lambda state: loop.call_soon_threadsafe(queue.put_nowait, state)
-        )
+        event = asyncio.Event()
+        pending = [None]
+
+        def changed(state):
+            pending[0] = state
+            loop.call_soon_threadsafe(event.set)
+
+        unsubscribe = store.subscribe(changed)
 
         async def states():
             while True:
-                await broadcast(await queue.get())
+                await event.wait()
+                event.clear()
+                await broadcast({"type": "state", "state": pending[0]})
 
         async def meters():
             while True:
                 await asyncio.sleep(0.1)
-                for ws in tuple(clients):
-                    try:
-                        await ws.send_json({"type": "telemetry", **telemetry()})
-                    except (ConnectionError, RuntimeError):
-                        clients.discard(ws)
+                await broadcast({"type": "telemetry", **telemetry()})
 
         tasks = [asyncio.create_task(states()), asyncio.create_task(meters())]
         yield
@@ -101,8 +90,7 @@ def create_app(store, telemetry=None, web_dir=None):
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        for ws in tuple(clients):
-            await ws.close()
+        await asyncio.gather(*(ws.close() for ws in tuple(clients)))
 
     app.cleanup_ctx.append(lifecycle)
 
@@ -143,6 +131,16 @@ def create_app(store, telemetry=None, web_dir=None):
 
         def change(state):
             if request.method == "DELETE":
+                if name == "assets":
+                    path = state[name][key]["path"]
+                    if path in asset_refs({k: v for k, v in state.items() if k != "assets"}):
+                        raise ValueError("Asset is in use; remove its references before deleting")
+                if name == "picture_sets":
+                    if state["settings"]["picture_set"] == key:
+                        state["settings"]["picture_set"] = None
+                    for scene in state["scenes"].values():
+                        if scene.get("picture_set") == key:
+                            scene["picture_set"] = None
                 del state[name][key]
                 for field in ("active_overlay", "active_scene"):
                     if (
@@ -157,6 +155,8 @@ def create_app(store, telemetry=None, web_dir=None):
 
         if request.method != "GET":
             store.transaction(change)
+            if request.method == "DELETE" and name == "assets":
+                await asyncio.to_thread(shutil.rmtree, root / "assets" / key, True)
         return web.json_response(store.get()[name].get(key))
 
     async def live(request):
@@ -170,14 +170,16 @@ def create_app(store, telemetry=None, web_dir=None):
                 scene = state[name][key]
                 for field in (
                     "mode",
-                    "mode_params",
+                    "modes",
                     "look",
-                    "quality",
                     "picture_set",
                     "source_asset",
                 ):
                     if field in scene:
-                        state["settings"][field] = scene[field]
+                        if field == "modes":
+                            state["settings"]["modes"].update(scene[field])
+                        else:
+                            state["settings"][field] = scene[field]
 
         return web.json_response(store.transaction(change))
 
@@ -225,9 +227,15 @@ def create_app(store, telemetry=None, web_dir=None):
                 if msg.type == WSMsgType.TEXT:
                     try:
                         body = json.loads(msg.data)
-                        if body.get("type") != "patch":
-                            raise ValueError("Expected patch message")
-                        store.patch(body["patch"])
+                        if body.get("type") == "command":
+                            store.runtime.enqueue_command(
+                                {k: v for k, v in body.items() if k != "type"}
+                            )
+                            await ws.send_json({"type": "command", "accepted": True})
+                        elif body.get("type") == "patch":
+                            store.patch(body["patch"])
+                        else:
+                            raise ValueError("Expected patch or command message")
                     except (ValueError, KeyError, TypeError, AttributeError) as exc:
                         await ws.send_json({"type": "error", "error": str(exc)})
         finally:
@@ -251,7 +259,9 @@ def create_app(store, telemetry=None, web_dir=None):
         return web.json_response(asset, status=201)
 
     async def export_template(request):
-        template = store.get()["overlays"][request.match_info["id"]]
+        template = store.get()["overlays"].get(request.match_info["id"])
+        if template is None:
+            raise web.HTTPNotFound(text="Unknown overlay")
         output = BytesIO()
         with ZipFile(output, "w") as archive:
             archive.writestr("template.json", json.dumps(template))
@@ -259,8 +269,11 @@ def create_app(store, telemetry=None, web_dir=None):
             for ref in asset_refs(template):
                 path = checked_path(root, ref)
                 if path.name == "manifest.json":
+                    manifest = loop_manifest(path.read_bytes())
+                    names.add(ref)
                     names.update(
-                        p.relative_to(root).as_posix() for p in path.parent.iterdir() if p.is_file()
+                        (path.parent / frame).relative_to(root).as_posix()
+                        for frame in manifest["frames"]
                     )
                 else:
                     names.add(ref)
@@ -271,77 +284,34 @@ def create_app(store, telemetry=None, web_dir=None):
     async def import_template(request):
         payload = await request.read()
 
-        def unpack():
-            with ZipFile(BytesIO(payload)) as archive:
-                members = archive.infolist()
-                if len(members) > 300 or sum(m.file_size for m in members) > MAX_UPLOAD:
-                    raise ValueError("Archive exceeds expanded size or file count limit")
-                if len({m.filename for m in members}) != len(members):
-                    raise ValueError("Duplicate archive entries")
-                template = validate("overlay", json.loads(archive.read("template.json")))
-                mapping = {}
-                blobs = {}
-                prefix = f"assets/{uuid4().hex}"
-                for member in members:
-                    if member.filename == "template.json":
-                        continue
-                    checked_path(root, member.filename)
-                    if member.is_dir() or (member.external_attr >> 16) & 0o170000 == 0o120000:
-                        raise ValueError("Only regular asset files are accepted")
-                    mapping[member.filename] = (
-                        prefix + "/" + member.filename.removeprefix("assets/")
-                    )
-                    blobs[member.filename] = archive.read(member)
-                if not asset_refs(template) <= set(mapping):
-                    raise ValueError("Archive is missing referenced assets")
-
-                def remap(value):
-                    if isinstance(value, str):
-                        return mapping.get(value, value)
-                    if isinstance(value, dict):
-                        return {k: remap(v) for k, v in value.items()}
-                    if isinstance(value, list):
-                        return [remap(v) for v in value]
-                    return value
-
-                template = remap(template)
-                if template["id"] in store.get()["overlays"]:
-                    template["id"] = uuid4().hex
-                validate("overlay", template)
-                for name, content in blobs.items():
-                    path = checked_path(root, mapping[name])
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(content)
-                imported_assets = {}
-                for ref in asset_refs(template):
-                    asset_id = uuid4().hex
-                    suffix = Path(ref).suffix.lower()
-                    kind = (
-                        "font"
-                        if suffix in (".ttf", ".otf")
-                        else ("logo" if suffix == ".json" else "image")
-                    )
-                    imported_assets[asset_id] = dict(
-                        id=asset_id,
-                        path=ref,
-                        original=None,
-                        kind=kind,
-                        name=Path(ref).name,
-                        warnings=[],
-                    )
-                store.patch({"overlays": {template["id"]: template}, "assets": imported_assets})
-                return template
-
-        return web.json_response(await asyncio.to_thread(unpack), status=201)
+        return web.json_response(
+            await asyncio.to_thread(import_archive, store, payload), status=201
+        )
 
     async def preview(request):
-        template = store.get()["overlays"][request.match_info["id"]]
+        template = store.get()["overlays"].get(request.match_info["id"])
+        if template is None:
+            raise web.HTTPNotFound(text="Unknown overlay")
         image = await asyncio.to_thread(
             overlay.render_preview, template, store.get()["now_playing"], (640, 360)
         )
         output = BytesIO()
         image.save(output, "PNG")
         return web.Response(body=output.getvalue(), content_type="image/png")
+
+    async def stage_command(request):
+        store.runtime.enqueue_command(await request.json())
+        return web.json_response({"accepted": True}, status=202)
+
+    async def stage_status(request):
+        return web.json_response(store.runtime.status())
+
+    async def stage_image(request):
+        result = store.runtime.image(request.match_info["name"])
+        if result is None:
+            raise web.HTTPNotFound(text="Image is not available")
+        content, content_type = result
+        return web.Response(body=content, content_type=content_type)
 
     async def asset_file(request):
         return web.FileResponse(checked_path(root, "assets/" + request.match_info["path"]))
@@ -363,6 +333,9 @@ def create_app(store, telemetry=None, web_dir=None):
     async def index(request):
         return web.FileResponse(static / "index.html")
 
+    app.router.add_get("/api/stage/status", stage_status)
+    app.router.add_post("/api/stage/command", stage_command)
+    app.router.add_get("/api/stage/image/{name}", stage_image)
     app.router.add_get("/ws", websocket)
     app.router.add_get("/api/schemas", schemas)
     app.router.add_get("/api/state", state)

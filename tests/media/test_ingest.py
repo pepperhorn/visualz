@@ -63,7 +63,7 @@ def test_video_and_logo(tmp_path):
     logo = ingest(tmp_path, "logo.mp4", content, "logo")
     manifest = json.loads((tmp_path / logo["path"]).read_text())
     assert 0 < manifest["duration"] <= 10
-    assert len(manifest["frames"]) <= 150
+    assert len(manifest["frames"]) <= 80
 
 
 def test_gl_lifecycle_when_display_available():
@@ -103,7 +103,35 @@ def test_gl_lifecycle_when_display_available():
         gl.glReadPixels(0, 0, 16, 16, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, pixels)
         assert tuple(pixels[8, 4]) == (255, 0, 0, 255)
         assert tuple(pixels[8, 11]) == (255, 255, 255, 255)
-        for resource in (small, textured, strip, fbo, texture, quad, program):
+        # An uploaded image is top-down; rendering its FBO texture onward must
+        # preserve orientation rather than flipping on every feedback pass.
+        vertical = Image.new("RGBA", (1, 2))
+        vertical.putdata([(255, 0, 0, 255), (0, 0, 255, 255)])
+        upload = Texture((1, 2), vertical)
+        first, second = Framebuffer((16, 16)), Framebuffer((16, 16))
+        normal, flipped = Quad(), Quad(flip_v=True)
+        first.bind()
+        normal.draw(textured, upload)
+        second.bind()
+        flipped.draw(textured, first.texture)
+        pixels = np.zeros((16, 16, 4), dtype=np.uint8)
+        gl.glReadPixels(0, 0, 16, 16, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE, pixels)
+        assert pixels[15, 8, 0] > 240 and pixels[15, 8, 2] < 15
+        assert pixels[0, 8, 2] > 240 and pixels[0, 8, 0] < 15
+        for resource in (
+            normal,
+            flipped,
+            upload,
+            first,
+            second,
+            small,
+            textured,
+            strip,
+            fbo,
+            texture,
+            quad,
+            program,
+        ):
             resource.close()
     finally:
         context.close()
@@ -168,5 +196,25 @@ def test_duration_caps(tmp_path):
     assert float(json.loads(result.stdout)["format"]["duration"]) <= 60
     logo = ingest(tmp_path, source.name, content, "logo")
     manifest = json.loads((tmp_path / logo["path"]).read_text())
-    assert len(manifest["frames"]) == 150
+    assert len(manifest["frames"]) == 80
     assert manifest["duration"] == 10
+    assert manifest["fps"] == 8
+    frame = tmp_path / logo["path"]
+    assert all(max(Image.open(frame.parent / name).size) <= 128 for name in manifest["frames"])
+
+
+def test_conversion_uses_low_priority_and_one_thread(monkeypatch):
+    import visualz.media
+
+    seen = []
+
+    def run(args, **kwargs):
+        seen.append(args)
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(visualz.media.subprocess, "run", run)
+    monkeypatch.setattr(visualz.media.shutil, "which", lambda name: "/usr/bin/" + name)
+    visualz.media.run_ffmpeg(["-i", "input.mp4", "output.mp4"])
+    assert seen[0][:4] == ["nice", "-n", "19", "ffmpeg"]
+    assert seen[0].count("-threads") == 2
+    assert all(seen[0][n + 1] == "1" for n, arg in enumerate(seen[0]) if arg == "-threads")

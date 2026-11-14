@@ -21,8 +21,7 @@
           "type": {
             "enum": [
               "picture",
-              "clip",
-              "camera"
+              "clip"
             ]
           },
           "playback": {

@@ -9,8 +9,6 @@
       "smoothing": 0.7
     },
     "mode": "plasma",
-    "mode_params": {},
-    "quality": "medium",
     "look": {
       "style": "pixel",
       "pixel_size": 3,
@@ -81,7 +79,42 @@
       "enabled": false,
       "overlay": false,
       "fade_seconds": 0.5
-    }
+    },
+    "modes": {
+      "pixel-eye": {
+        "params": {},
+        "quality": "medium"
+      },
+      "kaleido": {
+        "params": {},
+        "quality": "medium"
+      },
+      "prism": {
+        "params": {},
+        "quality": "medium"
+      },
+      "liquid": {
+        "params": {},
+        "quality": "medium"
+      },
+      "opart": {
+        "params": {},
+        "quality": "medium"
+      },
+      "plasma": {
+        "params": {},
+        "quality": "medium"
+      },
+      "chromascope": {
+        "params": {},
+        "quality": "medium"
+      },
+      "gallery": {
+        "params": {},
+        "quality": "medium"
+      }
+    },
+    "hardware_profile": "auto"
   },
   "scenes": {},
   "overlays": {

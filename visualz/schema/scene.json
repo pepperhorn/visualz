@@ -9,27 +9,8 @@
       "type": "string"
     },
     "mode": {
-      "enum": [
-        "pixel-eye",
-        "kaleido",
-        "prism",
-        "liquid",
-        "opart",
-        "plasma",
-        "chromascope",
-        "gallery"
-      ]
-    },
-    "mode_params": {
-      "type": "object",
-      "additionalProperties": {
-        "type": [
-          "number",
-          "string",
-          "boolean",
-          "null"
-        ]
-      }
+      "type": "string",
+      "minLength": 1
     },
     "look": {
       "type": "object",
@@ -157,13 +138,6 @@
       ],
       "additionalProperties": false
     },
-    "quality": {
-      "enum": [
-        "low",
-        "medium",
-        "high"
-      ]
-    },
     "source_asset": {
       "anyOf": [
         {
@@ -186,14 +160,41 @@
       "type": "integer",
       "minimum": 0,
       "maximum": 10000
+    },
+    "modes": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "params",
+          "quality"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "params": {
+            "type": "object"
+          },
+          "quality": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          }
+        }
+      }
     }
   },
   "required": [
     "id",
     "name",
     "mode",
-    "mode_params",
-    "look"
+    "look",
+    "modes"
   ],
   "additionalProperties": false,
   "$schema": "https://json-schema.org/draft/2020-12/schema"

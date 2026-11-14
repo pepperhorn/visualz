@@ -28,11 +28,12 @@ class Context:
     def __init__(self, size=(1280, 720), window=False):
         if not window:
             os.environ.setdefault("SDL_VIDEODRIVER", "kmsdrm")
+            os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
         import pygame
 
         self.pygame = pygame
-        pygame.display.init()
         try:
+            pygame.display.init()
             pygame.display.gl_set_attribute(
                 pygame.GL_CONTEXT_PROFILE_MASK, pygame.GL_CONTEXT_PROFILE_ES
             )
@@ -107,9 +108,12 @@ class Program:
 
 
 class Quad:
-    """Quad(bounds=(-1,-1,1,1)): clip-space textured or fullscreen geometry."""
+    """Quad(bounds=(-1,-1,1,1), flip_v=False): clip-space geometry.
 
-    def __init__(self, bounds=(-1, -1, 1, 1)):
+    Default UVs suit top-to-bottom Pillow uploads. Use flip_v=True when sampling
+    Framebuffer.texture (GL bottom-to-top) for upscale or ping-pong feedback."""
+
+    def __init__(self, bounds=(-1, -1, 1, 1), flip_v=False):
         import numpy as np
 
         gl = api()
@@ -118,6 +122,8 @@ class Quad:
             [left, bottom, 0, 1, right, bottom, 1, 1, left, top, 0, 0, right, top, 1, 0],
             dtype="float32",
         )
+        if flip_v:
+            vertices[3::4] = 1 - vertices[3::4]
         self.id = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.id)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, vertices.nbytes, vertices, gl.GL_STATIC_DRAW)

@@ -10,6 +10,12 @@ class Worker:
 
     def __init__(self, store):
         self.store = store
+        self.runtime = store.runtime
+        self.runtime.register_command("camera", "snap", self.snap)
+        self.runtime.register_command("camera", "delete_all", self.clear)
+        self.runtime.publish_status(
+            "camera", {"present": False, "devices": self.devices(), "latest": None}
+        )
 
     def start(self):
         pass

@@ -1,6 +1,6 @@
 """Bounded, content-checked upload ingest. All outputs are beneath data/assets.
 
-Logo loops use numbered RGBA PNG frames plus manifest.json (15 fps, <=150 frames).
+Logo loops use numbered RGBA PNG frames plus manifest.json (8 fps, <=80 frames, <=128 px each; stream individual textures).
 Clips use silent MPEG4 MP4 at 480x270/15 fps; originals are retained for conversion.
 """
 
@@ -31,7 +31,24 @@ def run_ffmpeg(args):
         raise ValueError("ffmpeg is required for video conversion")
     try:
         result = subprocess.run(
-            ["ffmpeg", "-nostdin", "-v", "error", "-y", *args], capture_output=True, timeout=120
+            [
+                "nice",
+                "-n",
+                "19",
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-y",
+                "-threads",
+                "1",
+                *args[:-1],
+                "-threads",
+                "1",
+                args[-1],
+            ],
+            capture_output=True,
+            timeout=120,
         )
     except subprocess.TimeoutExpired as exc:
         raise ValueError("Media conversion exceeded 120 seconds") from exc
@@ -156,9 +173,9 @@ def ingest(data_dir, filename, content, kind="image"):
                         "10",
                         "-an",
                         "-vf",
-                        "scale=256:256:force_original_aspect_ratio=decrease,fps=15",
+                        "scale=128:128:force_original_aspect_ratio=decrease,fps=8",
                         "-frames:v",
-                        "150",
+                        "80",
                         str(directory / "frame-%04d.png"),
                     ]
                 )
@@ -166,9 +183,7 @@ def ingest(data_dir, filename, content, kind="image"):
                 if not frames:
                     raise ValueError("Logo contains no frames")
                 output = directory / "manifest.json"
-                output.write_text(
-                    json.dumps(dict(fps=15, duration=len(frames) / 15, frames=frames))
-                )
+                output.write_text(json.dumps(dict(fps=8, duration=len(frames) / 8, frames=frames)))
         return dict(
             id=asset_id,
             path=output.relative_to(root).as_posix(),

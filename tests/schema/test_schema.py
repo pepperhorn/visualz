@@ -33,3 +33,37 @@ def test_invalid_overlay_readable():
     template["texts"][0]["colour"] = "red"
     with pytest.raises(ValueError, match="texts.0.colour"):
         validate("overlay", template)
+
+
+def test_s2_mode_maps_open_identifiers_and_hardware_profile():
+    settings = defaults()["settings"]
+    settings["mode"] = "future-mode"
+    settings["modes"]["future-mode"] = {
+        "params": {"iterations": 12, "curve": [1, 2, 3]},
+        "quality": "high",
+    }
+    settings["hardware_profile"] = "low"
+    settings["audio"].update(device="shared_capture", left_channel=63, right_channel=64)
+    validate("settings", settings)
+    scene = {
+        "id": "future",
+        "name": "Future",
+        "mode": "future-mode",
+        "modes": settings["modes"],
+        "look": settings["look"],
+    }
+    validate("scene", scene)
+    settings["modes"]["future-mode"]["quality"] = "bad"
+    with pytest.raises(ValueError, match="quality"):
+        validate("settings", settings)
+
+
+def test_theme_and_palettes_are_hex_only():
+    settings = defaults()["settings"]
+    settings["theme"]["primary"] = "@primary"
+    with pytest.raises(ValueError, match="primary"):
+        validate("settings", settings)
+    settings = defaults()["settings"]
+    settings["palettes"]["neon"][0] = "@accent"
+    with pytest.raises(ValueError, match="palettes"):
+        validate("settings", settings)
