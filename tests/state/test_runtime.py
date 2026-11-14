@@ -17,7 +17,7 @@ def test_frame_rejected_quickly_without_changing_status():
     previous = runtime.status()
     frame = np.zeros((480, 270, 3), dtype=np.uint8)
     started = perf_counter()
-    with pytest.raises(ValueError, match=rf"camera\.frame.*{MAX_STATUS_ELEMENTS}"):
+    with pytest.raises(ValueError, match=rf"camera: total size exceeds.*{MAX_STATUS_ELEMENTS}"):
         runtime.publish_status("camera", {"latest": "new", "frame": frame})
     elapsed = perf_counter() - started
     assert elapsed < 0.005
@@ -35,7 +35,7 @@ def test_spectrum_accepted_and_detached_from_publisher():
 
 @pytest.mark.parametrize(
     "value",
-    [list(range(MAX_STATUS_ELEMENTS)), np.zeros((64, 64))],
+    [list(range(MAX_STATUS_ELEMENTS - 2)), np.zeros(MAX_STATUS_ELEMENTS - 2)],
 )
 def test_exact_limit_accepted(value):
     runtime = Runtime()
@@ -55,7 +55,7 @@ def test_exact_limit_accepted(value):
 )
 def test_sequence_and_nested_aggregate_limit(value):
     runtime = Runtime()
-    with pytest.raises(ValueError, match=rf"test\.value.*{MAX_STATUS_ELEMENTS}"):
+    with pytest.raises(ValueError, match=rf"test: total size exceeds.*{MAX_STATUS_ELEMENTS}"):
         runtime.publish_status("test", {"value": value})
     assert runtime.status() == {}
 
@@ -63,7 +63,7 @@ def test_sequence_and_nested_aggregate_limit(value):
 def test_object_array_cannot_hide_oversized_sequence():
     values = np.empty(1, dtype=object)
     values[0] = [0] * (MAX_STATUS_ELEMENTS + 1)
-    with pytest.raises(ValueError, match=rf"test\.value.*{MAX_STATUS_ELEMENTS}"):
+    with pytest.raises(ValueError, match=rf"test: total size exceeds.*{MAX_STATUS_ELEMENTS}"):
         Runtime().publish_status("test", {"value": values})
 
 
@@ -101,3 +101,147 @@ def test_blocked_coercion_allows_status_and_command_drain():
 def test_defensive_coercion_remains_unbounded_by_default():
     values = np.zeros(MAX_STATUS_ELEMENTS + 1)
     assert len(JsonCoercer()(values)) == values.size
+
+
+@pytest.mark.parametrize("kind", ["bytes", "bytearray", "memoryview", "dict"])
+def test_binary_frames_and_large_mappings_rejected_quickly(kind):
+    runtime = Runtime()
+    if kind == "dict":
+        value = dict.fromkeys(range(200_000), 0)
+    else:
+        frame = np.zeros((480, 270, 3), dtype=np.uint8)
+        value = {"bytes": bytes, "bytearray": bytearray, "memoryview": memoryview}[kind](
+            frame.tobytes()
+        )
+    started = perf_counter()
+    with pytest.raises(ValueError, match=rf"^camera: total size exceeds.*{MAX_STATUS_ELEMENTS}"):
+        runtime.publish_status("camera", {"frame": value})
+    assert perf_counter() - started < 0.005
+    assert runtime.status() == {}
+
+
+def test_mapping_keys_and_values_share_aggregate_budget():
+    runtime = Runtime()
+    # Outer key/value pair plus 2047 inner key/value pairs exhaust the budget.
+    runtime.publish_status("test", {"value": dict.fromkeys(range(2047), 0)})
+    previous = runtime.status()
+    with pytest.raises(ValueError, match=r"^test: total size exceeds"):
+        runtime.publish_status("test", {"value": dict.fromkeys(range(2048), 0)})
+    with pytest.raises(ValueError, match=r"^test: total size exceeds"):
+        runtime.publish_status("test", {"value": {tuple(range(4096)): 0}})
+    assert runtime.status() == previous
+
+
+def test_aggregate_error_names_target_instead_of_last_nested_field():
+    with pytest.raises(ValueError) as raised:
+        Runtime().publish_status("audio", {"spectrum": [0] * 4000, "x": [0] * 100})
+    assert str(raised.value) == f"audio: total size exceeds the {MAX_STATUS_ELEMENTS} element status limit"
+
+
+def test_oversized_command_args_and_result_do_not_interrupt_drain():
+    runtime = Runtime()
+    values = list(range(MAX_STATUS_ELEMENTS + 1))
+    callbacks = []
+    runtime.register_command("test", "echo", lambda value: value)
+    runtime.enqueue_command(
+        {"id": "large", "target": "test", "name": "echo", "args": {"value": values}},
+        callbacks.append,
+    )
+    # Drain one first so its bounded summary can be inspected.
+    runtime.drain_commands()
+    summary = runtime.status()["commands"]
+    assert summary["last"] == {"id": "large", "target": "test", "name": "echo"}
+    assert summary["result"]["ok"] is True
+    assert "value" not in summary["result"] and "args" not in summary["last"]
+    assert callbacks[0]["value"] == values
+    assert runtime.command_result("large")["value"] == values
+    callbacks.clear()
+    for command_id, value in (("large-again", values), ("next", "ok")):
+        runtime.enqueue_command(
+            {"id": command_id, "target": "test", "name": "echo", "args": {"value": value}},
+            callbacks.append,
+        )
+    runtime.drain_commands(budget_ms=1000)
+    assert [result["id"] for result in callbacks] == ["large-again", "next"]
+    assert callbacks[0]["value"] == values and callbacks[1]["value"] == "ok"
+
+
+@pytest.mark.parametrize("fail_slow_publication", [False, True])
+def test_publication_exceptions_never_prevent_callbacks_or_next_command(
+    monkeypatch, caplog, fail_slow_publication
+):
+    from itertools import count
+    import visualz.state.runtime as runtime_module
+
+    runtime = Runtime()
+    callbacks = []
+    publish = runtime.publish_status
+
+    def broken_publication(target, values):
+        if not fail_slow_publication or "slow_handler" in values:
+            raise RuntimeError("injected publication failure")
+        publish(target, values)
+
+    # Deterministically exercise the slow-handler publication without sleeping.
+    monkeypatch.setattr(runtime_module.time, "perf_counter", lambda ticks=count(step=0.006): next(ticks))
+    monkeypatch.setattr(runtime, "publish_status", broken_publication)
+    runtime.register_command("test", "ping", lambda: "pong")
+    for command_id in ("first", "next"):
+        runtime.enqueue_command(
+            {"id": command_id, "target": "test", "name": "ping", "args": {}}, callbacks.append
+        )
+    runtime.drain_commands(budget_ms=1000)
+    assert [result["id"] for result in callbacks] == ["first", "next"]
+    assert all(result["value"] == "pong" for result in callbacks)
+    assert "Command status publication failed" in caplog.text
+
+
+def test_command_error_status_truncated_but_client_result_kept():
+    runtime = Runtime()
+    message = "x" * 10_000
+    callbacks = []
+
+    def fail():
+        raise ValueError(message)
+
+    runtime.register_command("test", "fail", fail)
+    runtime.enqueue_command({"target": "test", "name": "fail", "args": {}}, callbacks.append)
+    runtime.drain_commands()
+    assert callbacks[0]["error"] == message
+    assert runtime.command_result(callbacks[0]["id"])["error"] == message
+    summary = runtime.status()["commands"]
+    assert summary["result"]["ok"] is False
+    assert summary["error"] == summary["result"]["error"] == message[:256]
+
+
+def test_status_deepcopy_outside_lock_preserves_snapshot_during_updates(monkeypatch):
+    import visualz.state.runtime as runtime_module
+
+    runtime = Runtime()
+    runtime.publish_status("audio", {"levels": [1, 2]})
+    runtime.publish_image("latest", b"old", metadata={"sequence": 1})
+    copying = Event()
+    release = Event()
+    deepcopy = runtime_module.deepcopy
+
+    def blocked_copy(value):
+        copying.set()
+        assert release.wait(3)
+        return deepcopy(value)
+
+    monkeypatch.setattr(runtime_module, "deepcopy", blocked_copy)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        snapshot = pool.submit(runtime.status)
+        try:
+            assert copying.wait(1)
+            pool.submit(runtime.publish_status, "audio", {"levels": [3]}).result(timeout=1)
+            pool.submit(runtime.publish_image, "latest", b"new", "image/png").result(timeout=1)
+            pool.submit(runtime.publish_image, "latest", None).result(timeout=1)
+        finally:
+            release.set()
+        before = snapshot.result(timeout=1)
+    assert before["audio"]["levels"] == [1, 2]
+    assert before["images"]["latest"]["sequence"] == 1
+    assert runtime.status() == {"audio": {"levels": [3]}, "images": {}}
+    before["audio"]["levels"].append(99)
+    assert runtime.status()["audio"]["levels"] == [3]

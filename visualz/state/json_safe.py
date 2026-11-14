@@ -2,6 +2,7 @@
 
 import logging
 import math
+from collections.abc import Sized
 from threading import RLock
 
 
@@ -21,34 +22,35 @@ class JsonCoercer:
             return f"<{type(value).__module__}.{type(value).__name__}>"
 
     def _check_size(self, value, key, remaining, seen):
-        """Bound aggregate sequence slots before allocating converted arrays."""
+        """Bound aggregate container slots/bytes before allocating conversions."""
         if id(value) in seen:
             return
         seen.add(id(value))
         try:
             if isinstance(value, dict):
-                children = (
-                    (v, f"{key}.{k}" if isinstance(k, (str, int, float, bool)) else key + ".<key>")
-                    for k, v in value.items()
-                )
+                remaining[0] -= 2 * len(value)
+                children = (child for pair in value.items() for child in pair)
             elif isinstance(value, (list, tuple, set, frozenset)):
                 remaining[0] -= len(value)
-                children = ((v, f"{key}[]") for v in value)
+                children = iter(value)
             elif type(value).__module__.split(".")[0] == "numpy":
                 remaining[0] -= int(getattr(value, "size", 1))
                 # Object arrays can themselves contain sequences or arrays.
                 children = (
-                    ((v, f"{key}[]") for v in value.flat)
+                    iter(value.flat)
                     if getattr(getattr(value, "dtype", None), "hasobject", False)
                     and hasattr(value, "flat")
                     else ()
                 )
+            elif isinstance(value, Sized) and not isinstance(value, str):
+                remaining[0] -= value.nbytes if isinstance(value, memoryview) else len(value)
+                children = ()
             else:
                 return
             if remaining[0] < 0:
-                raise ValueError(f"{key} exceeds the {remaining[1]} element status limit")
-            for child, child_key in children:
-                self._check_size(child, child_key, remaining, seen)
+                raise ValueError(f"{key}: total size exceeds the {remaining[1]} element status limit")
+            for child in children:
+                self._check_size(child, key, remaining, seen)
         finally:
             seen.remove(id(value))
 
