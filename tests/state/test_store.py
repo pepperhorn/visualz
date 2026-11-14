@@ -379,3 +379,62 @@ def test_deleted_document_stays_deleted_after_restart(
             assert path.with_name("delete-me.invalid.json").read_bytes() == b"{unfinished hand edit"
     finally:
         restarted.close()
+
+
+@pytest.mark.parametrize("rename", [False, True], ids=["same-content", "corrected-content"])
+def test_quarantined_overlay_replacement_survives_later_save(tmp_path, rename):
+    import json
+
+    store = Store(tmp_path, debounce=100)
+    path = tmp_path / "overlays/lower-third.json"
+    try:
+        store.flush()
+        original = path.read_bytes()
+        path.write_bytes(b"{unfinished hand edit")
+        store.patch({"overlays": {"title-card": {"name": "Trigger quarantine"}}})
+        store.flush()
+        assert not path.exists()
+        rejected = path.with_name("lower-third.invalid.json")
+        assert rejected.read_bytes() == b"{unfinished hand edit"
+
+        store.transaction(lambda state: state["overlays"].pop("lower-third"))
+        store.flush()
+        corrected = json.loads(original)
+        if rename:
+            corrected["name"] = "Corrected hand edit"
+        content = json.dumps(corrected).encode()
+        path.write_bytes(content)
+        store.patch({"overlays": {"title-card": {"name": "Next save"}}})
+        store.flush()
+        assert path.read_bytes() == content
+        assert rejected.read_bytes() == b"{unfinished hand edit"
+        store.reload_documents()
+        store._pending.join()
+        assert store.get()["overlays"]["lower-third"] == corrected
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("earlier_save", [False, True], ids=["first-save", "after-save"])
+def test_changed_overlay_is_not_deleted_by_flush(tmp_path, earlier_save):
+    import json
+
+    seed = Store(tmp_path)
+    seed.close()
+    path = tmp_path / "overlays/lower-third.json"
+    store = Store(tmp_path, debounce=100)
+    try:
+        if earlier_save:
+            store.flush()
+        edited = dict(store.get()["overlays"]["lower-third"], name="External replacement")
+        content = json.dumps(edited).encode()
+        path.unlink()
+        path.write_bytes(content)
+        store.transaction(lambda state: state["overlays"].pop("lower-third"))
+        store.flush()
+        assert path.read_bytes() == content
+        store.reload_documents()
+        store._pending.join()
+        assert store.get()["overlays"]["lower-third"] == edited
+    finally:
+        store.close()
