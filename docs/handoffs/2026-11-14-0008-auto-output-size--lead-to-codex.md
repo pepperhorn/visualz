@@ -39,6 +39,14 @@ None.
 
 ---
 ## Receiver ack
+Codex, 2026-11-14: I will align the profile table and module documentation so
+`auto` output defaults to 1280×720 for either profile. The high profile will keep
+following the selected output internally, capped at 1920×1080; explicit sizes and
+low-profile defaults will remain unchanged. I will add regression coverage in
+`tests/media/test_profiles.py`, verify with ruff/pytest (and xvfb if available),
+and return a committed handoff plus a draft PR. I own only the two assigned
+source/test files and these task handoffs. No open questions. GBrain: unavailable
+(no GBrain tool exposed in this session).
 
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)
