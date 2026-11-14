@@ -14,7 +14,7 @@ Next ID: 0005
 | 0001 | Audio-reactive visuals for live shows (v1) | changes-requested | child node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Athread-send%3A0001-t1-fix-r1 | T1: codex/gpt-6.1-sol | T1: orch/0001-t1-scaffold | T1: https://github.com/pepperhorn/visualz/pull/1 (head 4587a47) | T1: /home/t3box/.t3/worktrees/visualz/t3-973ffe37-9ffd194d47c599aa | T1 task `node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1` · thread `thread:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1` · review r1 `node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-review-r1` · fix r1 `node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Athread-send%3A0001-t1-fix-r1` | [spec](../specs/0001-audio-reactive-visuals.md) | [plan](../plans/0001-audio-reactive-visuals.md) | [T1 return](../handoffs/2026-11-14-0001-t1-scaffold--codex-to-lead.md) (on branch, at 4587a47) | 2026-11-14 |
 | 0002 | XR18 web mixer and personal monitor mixes | planned | human: approve spec 0002 (no open questions left); build starts after 0001 T1 and T4 | — | — | — | — | — | [spec](../specs/0002-xr18-web-mixer.md) | [plan](../plans/0002-xr18-web-mixer.md) | — | 2026-11-14 |
 | 0003 | Stereo and multitrack recording to a USB drive | planned | human: approve spec 0003 and answer its 2 open questions; build starts after 0001 T1, T2, T4, T5 | — | — | — | — | — | [spec](../specs/0003-usb-recording.md) | [plan](../plans/0003-usb-recording.md) | — | 2026-11-14 |
-| 0004 | X32 support: mixer profile for 0002 and 32-track recording check for 0003 | proposed | human: confirm you have or will use an X32, which model, and which USB card (X-USB or X-LIVE); spec follows once 0002 is built | — | — | — | — | — | — | — | — | 2026-11-14 |
+| 0004 | X32 Rack support (X-USB card, S16 stage box): mixer profile and 32-track recording | specced | human: approve spec 0004 and answer its 3 open questions; plan and build follow 0002 and 0003 | — | — | — | — | — | [spec](../specs/0004-x32-support.md) | — | — | 2026-11-14 |
 
 ## Done / closed
 
@@ -37,6 +37,7 @@ Last health scan: never
 
 ## Log
 <!-- One line per status change, newest first: YYYY-MM-DD NNNN old→new — note -->
+2026-11-14 0004 proposed→specced — human confirmed X32 Rack + X-USB + S16; spec drafted
 2026-11-14 0004 —→proposed — X32 support, from the human's interest and four reference repos; licences checked (GPL-3 and unlicensed code is reference-only)
 2026-11-14 0001 in-review→changes-requested — review r1 (claude-opus-5-5) on head 4587a47: 3 blocking (no server→worker seam, ZIP import skips type checks, truncated state.json blocks start-up), 5 should-fix; implementer resumed (0001-t1-fix-r1) with lead decisions
 2026-11-14 0001 — human: start on the Pi (primary target); NUC and Orange Pi remain candidates. 0002 and 0003 made model-agnostic (mixer profile, device channel count) so X32 can follow
