@@ -11,6 +11,8 @@ Accepted means queued, not completed. Optional unique client id (string/integer,
 clients read GET /api/stage/result/<id>; WS results return to the originating
 connection. The last 128 results are retained; do not reuse a cached id.
 Handler failures appear in caller results and status.commands, never escape.
+Command status contains bounded summaries, never raw arguments/return values;
+publication failures are logged without preventing client result callbacks.
 Full queues return HTTP 503 / Retry-After: 1 (WS error status/retry_after).
 
 Initial commands (args are keyword arguments): audio.refresh_devices();
@@ -20,6 +22,11 @@ media.reconvert(asset_id), overlays.reload().
 T2 replaces neutral audio/camera/gallery handlers by registering the same names.
 
 publish_status(target, dict) merges volatile fields; status() returns a copy.
+Coercion runs before taking the runtime lock. MAX_STATUS_ELEMENTS (4096) bounds the
+total array/sequence slots, dict keys and values, and binary buffer bytes in each
+update (including nested containers); oversized updates raise ValueError naming
+the top-level target and total-size limit,
+without changing prior status. NumPy sizes are checked before tolist().
 Audio: devices [{id,name,channels}] (actual capture channels, not configured stereo),
 levels {level,left,right,bass,mid,treble,beat}. Camera: present, devices, latest
 (image endpoint name or null). Stage: fps, gl_renderer, hardware_profile (detected
@@ -38,6 +45,9 @@ from inspect import signature
 from queue import Empty, Full, Queue
 from threading import RLock
 import re
+
+
+MAX_STATUS_ELEMENTS = 4096
 
 
 class CommandQueueFull(ValueError):
@@ -135,14 +145,20 @@ class Runtime:
                 self._results.move_to_end(str(command["id"]))
                 while len(self._results) > 128:
                     self._results.popitem(last=False)
-            self.publish_status(
-                "commands",
-                {"last": command, "error": result["error"], "last_ms": elapsed, "result": result},
-            )
-            if elapsed > 5:
-                slow = dict(target=command["target"], name=command["name"], milliseconds=elapsed)
-                logging.warning("Slow command handler: %s", slow)
-                self.publish_status("commands", {"slow_handler": slow})
+            try:
+                last = {key: command[key] for key in ("target", "name", "id")}
+                error = result["error"][:256] if result["error"] is not None else None
+                summary = {**last, "ok": result["error"] is None, "error": error}
+                self.publish_status(
+                    "commands",
+                    {"last": last, "error": error, "last_ms": elapsed, "result": summary},
+                )
+                if elapsed > 5:
+                    slow = dict(target=command["target"], name=command["name"], milliseconds=elapsed)
+                    logging.warning("Slow command handler: %s", slow)
+                    self.publish_status("commands", {"slow_handler": slow})
+            except Exception:
+                logging.exception("Command status publication failed")
             if callback is not None:
                 try:
                     callback(deepcopy(result))
@@ -152,12 +168,14 @@ class Runtime:
     def publish_status(self, target, values):
         if not isinstance(values, dict):
             raise ValueError("Status must be an object")
+        values = self.coerce(values, str(target), max_elements=MAX_STATUS_ELEMENTS)
         with self._lock:
-            self._status.setdefault(target, {}).update(self.coerce(values, str(target)))
+            self._status[target] = {**self._status.get(target, {}), **values}
 
     def status(self):
         with self._lock:
-            return deepcopy(self._status)
+            snapshot = self._status.copy()
+        return deepcopy(snapshot)
 
     def publish_image(self, name, content, content_type="image/jpeg", metadata=None):
         if not re.fullmatch(r"[a-zA-Z0-9_-]{1,100}", name):
@@ -168,15 +186,17 @@ class Runtime:
         ):
             raise ValueError("Image must be JPEG/PNG/WebP and at most 2 MiB")
         with self._lock:
+            images = self._status.get("images", {}).copy()
             if content is None:
                 self._images.pop(name, None)
-                self._status.setdefault("images", {}).pop(name, None)
+                images.pop(name, None)
             else:
                 self._images[name] = (bytes(content), content_type)
-                self._status.setdefault("images", {})[name] = self.coerce(
+                images[name] = self.coerce(
                     {**(metadata or {}), "content_type": content_type, "bytes": len(content)},
                     f"images.{name}",
                 )
+            self._status["images"] = images
 
     def image(self, name):
         with self._lock:
