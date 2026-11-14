@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>visualz mockups</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Bebas+Neue&family=Bungee&family=Bungee+Shade&family=Inter:wght@400;600;800&family=Monoton&family=Pixelify+Sans:wght@400;700&family=Press+Start+2P&family=Righteous&family=Rubik+Mono+One&family=Shrikhand&family=Silkscreen:wght@400;700&family=Space+Grotesk:wght@400;700&family=Space+Mono:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0e0f13;--panel:#181a21;--panel2:#20232c;--line:#2e323e;--text:#eceef4;--dim:#9299a8;--accent:#ff4fa3;--accent2:#35d6c5;--warn:#ffb020;--ok:#3ddc84;--bad:#ff5a4f}
+*{box-sizing:border-box}
+body{margin:0;color:var(--foreground,#eceef4);font:15px/1.5 Inter,system-ui,sans-serif}
+main{max-width:1180px;margin:0 auto;padding:0 0 24px}
+h1{font:800 28px/1.2 Inter,system-ui;margin:0 0 4px}
+h2{font:800 20px/1.2 Inter,system-ui;margin:40px 0 4px}
+h2:first-of-type{margin-top:8px}
+p.lead{color:var(--muted-foreground,#9299a8);margin:0 0 18px;max-width:70ch}
+.note{color:var(--muted-foreground,#9299a8);font-size:13px;margin:8px 0 0}
+.grid{display:grid;gap:18px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.gphones{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+figure{margin:0}
+figcaption{color:var(--muted-foreground,#9299a8);font-size:13px;margin-top:8px}
+figcaption b{color:var(--foreground,#eceef4)}
+
+/* stage */
+.stage{position:relative;aspect-ratio:16/9;background:#000;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.px canvas{image-rendering:pixelated}
+.bug{position:absolute;right:4%;bottom:6%;width:13%;aspect-ratio:1;display:grid;place-items:center}
+.bug svg{width:100%;height:100%}
+.spin{animation:spin 9s linear infinite;transform-origin:50% 50%}
+@keyframes spin{to{transform:rotate(360deg)}}
+.l3{position:absolute;left:4%;bottom:8%;display:flex;flex-direction:column;align-items:flex-start;gap:0}
+.l3 .a{font-family:"Press Start 2P",monospace;font-size:clamp(10px,1.9vw,20px);background:#ffe14a;color:#16081f;padding:.5em .7em;letter-spacing:.02em}
+.l3 .b{font-family:VT323,monospace;font-size:clamp(14px,2.5vw,26px);background:#16081f;color:#fff;padding:.05em .6em;line-height:1.2}
+.card{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.card .t{font-family:Anton,sans-serif;font-size:clamp(28px,6.5vw,74px);line-height:.95;color:#fff7e6;text-transform:uppercase;letter-spacing:.01em;text-shadow:.05em .05em 0 #e0245e}
+.card .s{font-family:"Space Mono",monospace;font-weight:700;font-size:clamp(9px,1.4vw,15px);letter-spacing:.35em;color:#111;background:#fff7e6;display:inline-block;padding:.3em .9em;margin-top:.9em;text-transform:uppercase}
+.corner{position:absolute;left:4%;top:7%;font-family:Monoton,cursive;font-size:clamp(14px,2.6vw,30px);color:#fff;text-shadow:0 0 .4em #35d6c5}
+
+/* phones */
+.phone{background:#000;border:1px solid #3a3f4d;border-radius:28px;padding:10px;max-width:330px;margin:0 auto;width:100%}
+.screen{color:var(--text);background:var(--bg);border-radius:20px;overflow:hidden;height:610px;display:flex;flex-direction:column;font-size:13px}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.bar b{font-size:14px}
+.pill{font-size:11px;padding:2px 8px;border-radius:99px;background:#16352a;color:var(--ok);white-space:nowrap}
+.pill.w{background:#3a2c10;color:var(--warn)}
+.body{flex:1;overflow:hidden;padding:10px 12px;display:flex;flex-direction:column;gap:10px}
+.tabs{display:flex;background:var(--panel);border-top:1px solid var(--line)}
+.tabs span{flex:1;text-align:center;padding:9px 0;font-size:11px;color:var(--dim)}
+.tabs .on{color:var(--accent);font-weight:700}
+.lab{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:5px}
+.modes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.m{aspect-ratio:1;border-radius:8px;display:flex;align-items:flex-end;padding:4px;font-size:9px;font-weight:700;border:2px solid transparent;color:#fff;text-shadow:0 1px 2px #000}
+.m.on{border-color:#fff}
+.row{display:flex;gap:8px;align-items:center}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;text-align:center;flex:1;font-weight:600}
+.btn.p{background:var(--accent);border-color:var(--accent);color:#1a0010}
+.btn.k{background:#000;border-color:#555}
+.sl{flex:1;height:6px;border-radius:9px;background:var(--panel2);position:relative}
+.sl i{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:var(--accent2)}
+.sl u{position:absolute;top:-6px;width:18px;height:18px;border-radius:50%;background:#fff;margin-left:-9px}
+.slides{display:flex;gap:6px}
+.slide{flex:1;aspect-ratio:16/9;border-radius:6px;background:#1c1230;border:2px solid var(--line);position:relative;overflow:hidden}
+.slide.on{border-color:var(--accent)}
+.slide em{position:absolute;left:4px;top:3px;font:700 9px Inter;font-style:normal;color:#fff}
+.slide .d1{position:absolute;right:6%;bottom:8%;width:16%;aspect-ratio:1;border-radius:50%;background:#ffe14a}
+.slide .d2{position:absolute;left:6%;bottom:12%;width:46%;height:16%;background:#ffe14a}
+.slide .d3{position:absolute;left:18%;right:18%;top:38%;height:24%;background:#fff7e6}
+.field{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meter{height:8px;border-radius:9px;background:var(--panel2);overflow:hidden;flex:1}
+.meter i{display:block;height:100%;background:linear-gradient(90deg,var(--ok) 0 70%,var(--warn) 70% 90%,var(--bad) 90%);animation:lv 1.1s ease-in-out infinite alternate}
+@keyframes lv{from{width:35%}40%{width:78%}to{width:55%}}
+.sw{width:22px;height:22px;border-radius:6px;border:1px solid #0006;flex:none}
+.kv{display:grid;grid-template-columns:86px 1fr;gap:7px 8px;align-items:center}
+.kv span{color:var(--dim)}
+.prev{aspect-ratio:16/9;border-radius:8px;background:linear-gradient(135deg,#3b0f6b,#e0245e 60%,#ffb020);position:relative;overflow:hidden;flex:none}
+.prev .l3{left:5%;bottom:9%}
+.prev .l3 .a{font-size:9px}.prev .l3 .b{font-size:13px}
+
+/* mixer */
+.strips{display:flex;gap:5px;flex:1;min-height:0}
+.strip{flex:1;background:var(--panel);border-radius:8px;display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:6px;min-width:0}
+.strip .nm{font-size:9px;font-weight:700;width:100%;text-align:center;padding:3px 0;color:#111;white-space:nowrap;overflow:hidden}
+.strip .fd{flex:1;width:100%;display:flex;justify-content:center;gap:5px;min-height:0}
+.track{width:6px;border-radius:9px;background:#0b0c10;position:relative;height:100%}
+.track b{position:absolute;left:-9px;width:24px;height:14px;border-radius:4px;background:#e8eaf0;box-shadow:0 2px 4px #000}
+.vu{width:5px;border-radius:9px;background:#0b0c10;height:100%;display:flex;align-items:flex-end;overflow:hidden}
+.vu i{width:100%;background:linear-gradient(0deg,var(--ok) 0 70%,var(--warn) 70% 90%,var(--bad) 90%);animation:vu 1s ease-in-out infinite alternate}
+@keyframes vu{from{height:30%}50%{height:80%}to{height:50%}}
+.mute{font-size:9px;font-weight:800;border-radius:5px;padding:4px 0;width:80%;text-align:center;background:var(--panel2);color:var(--dim)}
+.mute.on{background:var(--bad);color:#200}
+.db{font-size:9px;color:var(--dim)}
+.chips{display:flex;gap:6px;overflow:hidden}
+.chip{padding:5px 9px;border-radius:99px;background:var(--panel2);font-size:11px;white-space:nowrap;font-weight:600}
+.chip.on{background:var(--accent2);color:#002a26}
+.eq{background:#0b0c10;border-radius:8px;border:1px solid var(--line)}
+.sec{background:var(--panel);border-radius:10px;padding:9px 10px}
+.sec h4{margin:0 0 7px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;display:flex;justify-content:space-between;color:var(--dim)}
+.tog{display:inline-block;width:30px;height:16px;border-radius:99px;background:var(--accent2);position:relative;vertical-align:middle}
+.tog:after{content:"";position:absolute;right:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff}
+.tog.off{background:#444}.tog.off:after{right:auto;left:2px}
+.knobs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center}
+.knobs b{display:block;font-size:12px}.knobs span{font-size:9px;color:var(--dim)}
+.me{display:grid;grid-template-columns:62px 1fr 34px;gap:9px 8px;align-items:center}
+.me .star{color:var(--warn)}
+.big{background:linear-gradient(90deg,#3a1030,#5a1848);border:1px solid var(--accent);border-radius:12px;padding:10px;text-align:center}
+.big b{display:block;font-size:15px}
+
+/* fonts */
+.fonts{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px}
+.f{background:var(--card,#181a21);border:1px solid var(--border,#2e323e);border-radius:10px;padding:12px 14px;overflow:hidden}
+.f div{font-size:26px;line-height:1.15;white-space:nowrap}
+.f small{color:var(--muted-foreground,#9299a8);font-size:12px;display:block;margin-top:6px}
+.f.s div{font-size:17px}
+</style>
+</head>
+<body>
+<main>
+<p class="lead">Design sketches for specs 0001 and 0002, not the real app. Visuals here are simplified browser animations standing in for the Pi's shaders; band and song names are placeholders.</p>
+
+<h2>1. Projector output with overlay</h2>
+<p class="lead">Three overlay templates on three modes. Any template works over any mode.</p>
+<div class="grid g3">
+  <figure>
+    <div class="stage px"><canvas id="c1" width="128" height="72"></canvas>
+      <div class="l3"><div class="a">THE BAND NAME</div><div class="b">Song Title Goes Here</div></div>
+      <div class="bug"><svg viewBox="0 0 100 100"><g class="spin"><polygon points="50,6 61,38 95,38 67,58 78,92 50,71 22,92 33,58 5,38 39,38" fill="#ffe14a" stroke="#16081f" stroke-width="5"/></g><text x="50" y="58" text-anchor="middle" font-family="Press Start 2P" font-size="13" fill="#16081f">TBN</text></svg></div>
+    </div>
+    <figcaption><b>pixel-eye</b> mode, pixel look, 16-colour palette · template "Lower third": logo bug bottom-right (a looping video would sit here), band + song in Press Start 2P and VT323</figcaption>
+  </figure>
+  <figure>
+    <div class="stage"><canvas id="c2" width="640" height="360"></canvas>
+      <div class="card"><div><div class="t">The Band<br>Name</div><div class="s">Live · Tonight</div></div></div>
+    </div>
+    <figcaption><b>gallery / liquid</b> with the halftone look, duotone · template "Title card": Anton with a colour shadow, Space Mono strap line</figcaption>
+  </figure>
+  <figure>
+    <div class="stage"><canvas id="c3" width="640" height="360"></canvas>
+      <div class="corner">TBN</div>
+      <div class="bug" style="width:10%"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="none" stroke="#fff" stroke-width="5"/><g class="spin"><path d="M50 14 L58 50 L50 86 L42 50Z" fill="#35d6c5"/><path d="M14 50 L50 42 L86 50 L50 58Z" fill="#ff4fa3"/></g></svg></div>
+    </div>
+    <figcaption><b>chromascope</b>: left against right channel with feedback trails · template "Bug only": logo bottom-right, Monoton wordmark top-left</figcaption>
+  </figure>
+</div>
+
+<h2>2. Control UI (phone)</h2>
+<p class="lead">Opened from any phone or laptop on the venue Wi-Fi.</p>
+<div class="grid gphones">
+  <figure><div class="phone"><div class="screen">
+    <div class="bar"><b>visualz</b><span class="pill">● stage 31 fps</span></div>
+    <div class="body">
+      <div><div class="lab">Mode</div><div class="modes">
+        <div class="m on" style="background:linear-gradient(135deg,#3b0f6b,#ff6a3d)">pixel-eye</div>
+        <div class="m" style="background:conic-gradient(#e0245e,#ffb020,#35d6c5,#3b0f6b,#e0245e)">kaleido</div>
+        <div class="m" style="background:repeating-conic-gradient(#111 0 30deg,#234 30deg 60deg)">prism</div>
+        <div class="m" style="background:radial-gradient(circle at 30% 30%,#35d6c5,#124 40%,#ff6a3d)">liquid</div>
+        <div class="m" style="background:repeating-radial-gradient(#ff0 0 4px,#06f 4px 8px,#f30 8px 12px)">opart</div>
+        <div class="m" style="background:linear-gradient(45deg,#f0f,#0ff,#ff0)">plasma</div>
+        <div class="m" style="background:radial-gradient(circle,#0a2 0,#012 60%)">chroma</div>
+        <div class="m" style="background:linear-gradient(#555,#222)">gallery</div>
+      </div></div>
+      <div class="row"><div class="btn">Auto-cycle · 32 beats</div><div class="btn k">Blackout</div></div>
+      <div><div class="lab">Overlay slides</div><div class="slides">
+        <div class="slide"><em>1</em><i class="d1"></i></div>
+        <div class="slide on"><em>2</em><i class="d1"></i><i class="d2"></i></div>
+        <div class="slide"><em>3</em><i class="d3"></i></div>
+      </div></div>
+      <div class="row"><div class="btn">Prev</div><div class="btn">Clear</div><div class="btn p">Next</div></div>
+      <div><div class="lab">Now playing</div>
+        <div class="row" style="margin-bottom:6px"><div class="field">THE BAND NAME</div></div>
+        <div class="row"><div class="field">Song Title Goes Here</div></div></div>
+      <div><div class="lab">Input · XR18 USB ch 17/18</div><div class="row"><div class="meter"><i></i></div></div></div>
+    </div>
+    <div class="tabs"><span class="on">Live</span><span>Look</span><span>Overlays</span><span>Assets</span><span>Mixer</span></div>
+  </div></div><figcaption><b>Live</b>: everything needed during a set on one screen</figcaption></figure>
+
+  <figure><div class="phone"><div class="screen">
+    <div class="bar"><b>Look</b><span class="pill">● stage 31 fps</span></div>
+    <div class="body">
+      <div class="row"><div class="btn p">Pixel</div><div class="btn">Halftone</div><div class="btn">Off</div></div>
+      <div class="kv">
+        <span>Pixel size</span><div class="sl"><i style="width:55%"></i><u style="left:55%"></u></div>
+        <span>Colours</span><div class="sl"><i style="width:25%"></i><u style="left:25%"></u></div>
+        <span>Dither</span><div><i class="tog"></i></div>
+      </div>
+      <div><div class="lab">Palette</div>
+        <div class="row" style="flex-wrap:wrap;gap:5px">
+          <i class="sw" style="background:#16081f"></i><i class="sw" style="background:#3b0f6b"></i><i class="sw" style="background:#8a1c7c"></i><i class="sw" style="background:#e0245e"></i><i class="sw" style="background:#ff6a3d"></i><i class="sw" style="background:#ffb020"></i><i class="sw" style="background:#ffe14a"></i><i class="sw" style="background:#fff7e6"></i><i class="sw" style="background:#35d6c5"></i><i class="sw" style="background:#1e6fd9"></i>
+        </div>
+        <div class="row" style="margin-top:7px"><div class="field">Sunset 10</div><div class="btn" style="flex:none">Edit</div></div></div>
+      <div class="kv">
+        <span>Reactivity</span><div class="sl"><i style="width:70%"></i><u style="left:70%"></u></div>
+        <span>Speed</span><div class="sl"><i style="width:40%"></i><u style="left:40%"></u></div>
+        <span>Brightness</span><div class="sl"><i style="width:80%"></i><u style="left:80%"></u></div>
+        <span>Saturation</span><div class="sl"><i style="width:65%"></i><u style="left:65%"></u></div>
+        <span>Crossfade</span><div class="sl"><i style="width:30%"></i><u style="left:30%"></u></div>
+      </div>
+      <div><div class="lab">Scenes</div><div class="chips"><span class="chip on">Opener</span><span class="chip">Slow one</span><span class="chip">Big finish</span><span class="chip">+ Save</span></div></div>
+    </div>
+    <div class="tabs"><span>Live</span><span class="on">Look</span><span>Overlays</span><span>Assets</span><span>Mixer</span></div>
+  </div></div><figcaption><b>Look</b>: pixel or halftone, palette, and scenes</figcaption></figure>
+
+  <figure><div class="phone"><div class="screen">
+    <div class="bar"><b>Overlay · Lower third</b><span class="pill w">editing</span></div>
+    <div class="body">
+      <div class="prev"><div class="l3"><div class="a">{{band}}</div><div class="b">{{song}}</div></div><div class="bug" style="width:14%"><svg viewBox="0 0 100 100"><polygon points="50,6 61,38 95,38 67,58 78,92 50,71 22,92 33,58 5,38 39,38" fill="#ffe14a"/></svg></div></div>
+      <div class="chips"><span class="chip">Logo</span><span class="chip on">Text 1</span><span class="chip">Text 2</span><span class="chip">+ Add</span></div>
+      <div class="kv">
+        <span>Text</span><div class="field">{{band}}</div>
+        <span>Font</span><div class="field" style="font-family:'Press Start 2P';font-size:10px">Press Start 2P</div>
+        <span>Size</span><div class="sl"><i style="width:45%"></i><u style="left:45%"></u></div>
+        <span>Text colour</span><div class="row"><i class="sw" style="background:#16081f"></i><div class="field">#16081F</div></div>
+        <span>Box colour</span><div class="row"><i class="sw" style="background:#ffe14a"></i><div class="field">theme: accent</div></div>
+        <span>Outline</span><div class="row"><i class="sw" style="background:transparent;border:1px dashed #666"></i><div class="field">none</div></div>
+        <span>Position</span><div class="field">Lower third, left</div>
+        <span>Upper case</span><div><i class="tog"></i></div>
+        <span>Animation</span><div class="field">Slide in · show 12 s</div>
+      </div>
+      <div class="row"><div class="btn">Export JSON</div><div class="btn p">Take live</div></div>
+    </div>
+    <div class="tabs"><span>Live</span><span>Look</span><span class="on">Overlays</span><span>Assets</span><span>Mixer</span></div>
+  </div></div><figcaption><b>Overlay editor</b>: every font and colour is editable; the template is saved as a JSON file</figcaption></figure>
+</div>
+
+<h2>3. XR18 mixer</h2>
+<p class="lead">Engineer view, channel detail, and a musician's own monitor page.</p>
+<div class="grid gphones">
+  <figure><div class="phone"><div class="screen">
+    <div class="bar"><b>Mixer</b><span class="pill">● XR18 connected</span></div>
+    <div class="body">
+      <div class="chips"><span class="chip on">Main LR</span><span class="chip">Bus 1 Wedge</span><span class="chip">IEM 3-4</span><span class="chip">FX 1</span></div>
+      <div class="strips" id="strips"></div>
+      <div class="chips"><span class="chip on">1–6</span><span class="chip">7–12</span><span class="chip">13–16</span><span class="chip">Aux/FX</span><span class="chip">Buses</span></div>
+    </div>
+    <div class="tabs"><span>Live</span><span>Look</span><span>Overlays</span><span>Assets</span><span class="on">Mixer</span></div>
+  </div></div><figcaption><b>Engineer</b>: faders follow the selected mix (main, or sends to a bus); names and colours come from the mixer</figcaption></figure>
+
+  <figure><div class="phone"><div class="screen">
+    <div class="bar"><b>‹ 03 · Lead Vox</b><span class="pill">● XR18</span></div>
+    <div class="body">
+      <div class="sec"><h4>Preamp <span>ch 3</span></h4>
+        <div class="kv"><span>Gain +32 dB</span><div class="row"><div class="sl"><i style="width:62%"></i><u style="left:62%"></u></div></div>
+        <span>Input</span><div class="meter"><i></i></div></div>
+        <div class="row" style="margin-top:8px"><div class="btn" style="border-color:var(--bad);color:var(--bad)">48V ON</div><div class="btn">Ø Invert</div><div class="btn">Lo-cut 100</div></div></div>
+      <div class="sec"><h4>EQ <i class="tog"></i></h4>
+        <svg class="eq" viewBox="0 0 280 96" width="100%"><g stroke="#262a35" stroke-width="1"><path d="M0 48H280M70 0V96M140 0V96M210 0V96"/></g><path d="M0 92 C22 60 34 48 60 48 S96 66 118 62 S150 48 172 44 S206 26 232 30 S262 40 280 44" fill="none" stroke="#35d6c5" stroke-width="2.5"/><path d="M0 92 C22 60 34 48 60 48 S96 66 118 62 S150 48 172 44 S206 26 232 30 S262 40 280 44 V96H0Z" fill="#35d6c520"/><g fill="#fff" stroke="#0b0c10" stroke-width="2"><circle cx="28" cy="66" r="6"/><circle cx="112" cy="63" r="6"/><circle cx="196" cy="34" r="6"/><circle cx="250" cy="36" r="6"/></g></svg>
+        <div class="knobs" style="margin-top:6px"><div><b>100 Hz</b><span>Lo-cut</span></div><div><b>−3.5 dB</b><span>320 Hz</span></div><div><b>+4.0 dB</b><span>3.2 kHz</span></div><div><b>+2.0 dB</b><span>10 kHz shelf</span></div></div></div>
+      <div class="sec"><h4>Compressor <i class="tog"></i></h4>
+        <div class="knobs"><div><b>−18 dB</b><span>Thresh</span></div><div><b>4 : 1</b><span>Ratio</span></div><div><b>12 ms</b><span>Attack</span></div><div><b>+3 dB</b><span>Make-up</span></div></div></div>
+      <div class="sec"><h4>Gate <i class="tog off"></i></h4></div>
+      <div class="sec"><h4>Sends <span>6 bus · 4 FX</span></h4>
+        <div class="kv"><span>Bus 1 Wedge</span><div class="sl"><i style="width:66%"></i><u style="left:66%"></u></div><span>IEM 3-4</span><div class="sl"><i style="width:48%"></i><u style="left:48%"></u></div></div></div>
+    </div>
+    <div class="tabs"><span>Live</span><span>Look</span><span>Overlays</span><span>Assets</span><span class="on">Mixer</span></div>
+  </div></div><figcaption><b>Channel detail</b> (engineer only): preamp with confirmed 48 V, draggable EQ, dynamics, sends</figcaption></figure>
+
+  <figure><div class="phone"><div class="screen">
+    <div class="bar"><b>Sam · In-ears</b><span class="pill">● IEM 3-4</span></div>
+    <div class="body">
+      <div class="big"><b>MORE ME</b><div class="sl" style="margin:12px 8px 6px"><i style="width:60%;background:var(--accent)"></i><u style="left:60%"></u></div></div>
+      <div class="me">
+        <span><b class="star">●</b> My vox</span><div class="sl"><i style="width:78%"></i><u style="left:78%"></u></div><span class="db">L10</span>
+        <span><b class="star">●</b> My gtr</span><div class="sl"><i style="width:70%"></i><u style="left:70%"></u></div><span class="db">R20</span>
+        <span>Kick</span><div class="sl"><i style="width:52%"></i><u style="left:52%"></u></div><span class="db">C</span>
+        <span>Snare</span><div class="sl"><i style="width:44%"></i><u style="left:44%"></u></div><span class="db">C</span>
+        <span>Bass</span><div class="sl"><i style="width:58%"></i><u style="left:58%"></u></div><span class="db">C</span>
+        <span>Keys</span><div class="sl"><i style="width:36%"></i><u style="left:36%"></u></div><span class="db">L40</span>
+        <span>BVs</span><div class="sl"><i style="width:30%"></i><u style="left:30%"></u></div><span class="db">R35</span>
+      </div>
+      <div><div class="lab">My level · capped at −6 dB</div><div class="row"><div class="sl"><i style="width:64%"></i><u style="left:64%"></u></div></div>
+        <div class="row" style="margin-top:10px"><div class="meter"><i></i></div></div></div>
+      <div class="row"><div class="btn">Load profile</div><div class="btn">Save</div></div>
+    </div>
+  </div></div><figcaption><b>Musician page</b>, opened by QR code: only their own mix. In-ear mixes get pan (right column); wedges do not</figcaption></figure>
+</div>
+
+<h2>4. Fonts</h2>
+<p class="lead">Proposed bundled set. All are free to use, modify and redistribute (SIL Open Font Licence), so they can ship inside the public repo. You can also upload any TTF or OTF you have the rights to, such as your logo typeface.</p>
+<div class="lab">Pixel / 8-bit</div>
+<div class="fonts">
+  <div class="f"><div style="font-family:'Press Start 2P';font-size:17px">THE BAND NAME</div><small>Press Start 2P · arcade</small></div>
+  <div class="f"><div style="font-family:VT323;font-size:32px">The Band Name 1984</div><small>VT323 · terminal</small></div>
+  <div class="f"><div style="font-family:Silkscreen">The Band Name</div><small>Silkscreen · small caps pixel</small></div>
+  <div class="f"><div style="font-family:'Pixelify Sans';font-weight:700">The Band Name</div><small>Pixelify Sans · softer pixel</small></div>
+</div>
+<div class="lab" style="margin-top:16px">Bold display / poster</div>
+<div class="fonts">
+  <div class="f"><div style="font-family:Anton">THE BAND NAME</div><small>Anton · condensed poster</small></div>
+  <div class="f"><div style="font-family:'Bebas Neue';font-size:30px">THE BAND NAME</div><small>Bebas Neue · tall caps</small></div>
+  <div class="f"><div style="font-family:'Archivo Black'">The Band Name</div><small>Archivo Black · heavy grotesque</small></div>
+  <div class="f"><div style="font-family:'Rubik Mono One';font-size:20px">THE BAND NAME</div><small>Rubik Mono One · chunky</small></div>
+</div>
+<div class="lab" style="margin-top:16px">Retro / psychedelic</div>
+<div class="fonts">
+  <div class="f"><div style="font-family:Monoton">THE BAND</div><small>Monoton · neon lines</small></div>
+  <div class="f"><div style="font-family:Shrikhand">The Band Name</div><small>Shrikhand · 70s script</small></div>
+  <div class="f"><div style="font-family:Righteous">The Band Name</div><small>Righteous · deco</small></div>
+  <div class="f"><div style="font-family:Bungee;font-size:22px">THE BAND NAME</div><small>Bungee · signage (also Bungee Shade)</small></div>
+</div>
+<div class="lab" style="margin-top:16px">Clean text for song titles and credits</div>
+<div class="fonts">
+  <div class="f s"><div style="font-family:Inter;font-weight:600">Song Title Goes Here</div><small>Inter</small></div>
+  <div class="f s"><div style="font-family:'Space Grotesk';font-weight:700">Song Title Goes Here</div><small>Space Grotesk</small></div>
+  <div class="f s"><div style="font-family:'Space Mono';font-weight:700">Song Title Goes Here</div><small>Space Mono</small></div>
+</div>
+<p class="note">This page loads the fonts from Google Fonts to show them. On the Pi they are bundled files and nothing is fetched from the internet.</p>
+</main>
+<script>
+const PAL=["#16081f","#3b0f6b","#8a1c7c","#e0245e","#ff6a3d","#ffb020","#ffe14a","#fff7e6","#35d6c5","#1e6fd9"].map(h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)));
+const beat=t=>Math.pow(Math.max(0,Math.sin(t*4.2)),8);
+// 1: pixel-eye
+const c1=document.getElementById('c1'),x1=c1.getContext('2d'),im=x1.createImageData(128,72);
+const bayer=[0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5];
+function f1(t){const b=beat(t),d=im.data;for(let y=0;y<72;y++)for(let x=0;x<128;x++){
+  const u=(x-64)/64,v=(y-36)/36*.5625,r=Math.hypot(u,v*1.9);let k;
+  const sky=.5+.5*Math.sin(u*3+t*.4)*Math.cos(v*5-t*.3)+.25*Math.sin((u+v)*7+t*.7);
+  k=1+sky*3.2+(v<0?1.2:0);
+  const hill=.18+.07*Math.sin(Math.floor(x/6)*.9+1)+.05*Math.sin(Math.floor(x/10)*1.7);
+  if(v>hill)k=1+((Math.floor(x/4)+Math.floor(y/4+t*3))%2)*1.2;
+  const cl=Math.sin(Math.floor(x/8)*1.3+Math.floor(t*.6))*.5+.5;if(v<-.3+cl*.12&&v>-.42+cl*.1&&(Math.floor(x/8)%3))k=7;
+  const R=.34+b*.05;
+  if(r<R)k=7; if(r<R*.72)k=2+((Math.atan2(v,u)*6+t*2)&1); if(r<R*.5)k=4+(r<R*.42?1:0); if(r<R*.26)k=0; if(Math.hypot(u+.05,v*1.9+.05)<.035)k=7;
+  if(r>R&&r<R+.035)k=0;
+  k+=(bayer[(y&3)*4+(x&3)]/16-.5)*.9; k=Math.max(0,Math.min(9,Math.round(k)));
+  const p=PAL[k],i=(y*128+x)*4;d[i]=p[0];d[i+1]=p[1];d[i+2]=p[2];d[i+3]=255}
+  x1.putImageData(im,0,0)}
+// 2: halftone duotone
+const c2=document.getElementById('c2'),x2=c2.getContext('2d');
+function f2(t){const b=beat(t*.8);x2.fillStyle="#1b1147";x2.fillRect(0,0,640,360);x2.fillStyle="#ff5c8a";
+  const s=11,ca=Math.cos(.35),sa=Math.sin(.35);
+  for(let j=-30;j<60;j++)for(let i=-10;i<70;i++){const px=i*s*ca-j*s*sa,py=i*s*sa+j*s*ca;if(px<-s||px>650||py<-s||py>370)continue;
+    const u=px/640,v=py/360;let l=0;
+    for(let n=0;n<5;n++){const cx=.5+.38*Math.sin(t*.23*(n+1)+n*2),cy=.5+.36*Math.cos(t*.19*(n+1)+n);l+=.03*(1+n*.25+b*.6)/((u-cx)**2*1.8+(v-cy)**2+.012)}
+    l=Math.min(1,l*.14);const r=s*.72*Math.sqrt(l);if(r>.6){x2.beginPath();x2.arc(px,py,r,0,7);x2.fill()}}}
+// 3: chromascope
+const c3=document.getElementById('c3'),x3=c3.getContext('2d');x3.fillStyle="#04060c";x3.fillRect(0,0,640,360);
+function f3(t){x3.globalCompositeOperation="source-over";x3.fillStyle="rgba(4,6,12,.07)";x3.fillRect(0,0,640,360);
+  x3.globalCompositeOperation="lighter";const b=beat(t);
+  for(let k=0;k<3;k++){x3.beginPath();const a=2+k,bb=3+((t*.05)|0)%3+k*.5,ph=t*(.5+k*.2);
+    for(let i=0;i<=220;i++){const s=i/220*Math.PI*2,amp=120+40*b+k*18;
+      const X=320+Math.sin(a*s+ph)*amp*1.5*(1+.15*Math.sin(s*9+t*3)),Y=180+Math.sin(bb*s)*amp*.95;i?x3.lineTo(X,Y):x3.moveTo(X,Y)}
+    x3.strokeStyle=`hsla(${(t*40+k*110)%360},100%,60%,.55)`;x3.lineWidth=2.2;x3.stroke()}}
+let last=0;function loop(ms){const t=ms/1000;if(ms-last>66){f1(t);f2(t);last=ms}f3(t);requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
+// mixer strips
+const S=[["Kick","#ff6a3d",62,0],["Snare","#ffb020",58,0],["Ld Vox","#35d6c5",74,0],["Gtr","#e0245e",55,0],["Bass","#9d7bff",66,1],["Keys","#ffe14a",48,0]];
+document.getElementById('strips').innerHTML=S.map(([n,c,v,m],i)=>`<div class="strip"><div class="nm" style="background:${c}">${n}</div><div class="fd"><div class="track"><b style="bottom:calc(${v}% - 7px)"></b></div><div class="vu"><i style="animation-duration:${.6+i*.17}s;${m?'opacity:.25':''}"></i></div></div><div class="db">${(v/100*70-50).toFixed(0)} dB</div><div class="mute ${m?'on':''}">MUTE</div></div>`).join('');
+</script>
+</body>
+</html>
