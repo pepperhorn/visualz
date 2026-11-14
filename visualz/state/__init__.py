@@ -337,8 +337,11 @@ class Store:
                         except (ValueError, OSError, TypeError, KeyError) as exc:
                             self._reject_document(old, exc)
                             continue
-                    if old.stem not in current[collection] and old.stem in old_values:
+                    if old.stem not in current[collection] and (
+                        old.stem in old_values or old in self._disk_documents
+                    ):
                         old.unlink()
+                        self._disk_documents.pop(old, None)
                 for key, value in current[collection].items():
                     if directory / f"{key}.json" in self._rejected_paths:
                         continue

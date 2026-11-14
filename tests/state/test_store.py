@@ -323,3 +323,59 @@ def test_status_cycles_extended_numpy_and_bad_string_are_safe():
     assert snapshot["test"]["extended"] == 0.5
     assert "BrokenString" in snapshot["test"]["broken"]
     json.dumps(snapshot, allow_nan=False)
+
+
+@pytest.mark.parametrize("collection", ["overlays", "scenes", "picture_sets"])
+@pytest.mark.parametrize("earlier_save", [False, True], ids=["first-save", "after-save"])
+@pytest.mark.parametrize("invalid_edit", [False, True], ids=["valid-file", "invalid-edit"])
+def test_deleted_document_stays_deleted_after_restart(
+    tmp_path, collection, earlier_save, invalid_edit
+):
+    seed = Store(tmp_path, debounce=100)
+    state = seed.get()
+    documents = {
+        "overlays": dict(state["overlays"]["lower-third"], id="delete-me"),
+        "scenes": dict(
+            id="delete-me", name="Scene", mode="plasma", modes={}, look=state["settings"]["look"]
+        ),
+        "picture_sets": dict(
+            id="delete-me", name="Pictures", items=[], order="sequential", fit="fill",
+            transition="random", trigger="seconds", interval=30, amount=0.5,
+            camera=dict(
+                enabled=False, device=None, interval=30, keep_count=12, save=False,
+                mirror=False, rotation=0, brightness=0,
+            ),
+        ),
+    }
+    seed.patch({collection: {"delete-me": documents[collection]}})
+    seed.close()
+    path = tmp_path / collection / "delete-me.json"
+    assert path.exists()
+
+    store = Store(tmp_path, debounce=100)
+    try:
+        assert "delete-me" in store.get()[collection]
+        if earlier_save:
+            store.patch({"now_playing": {"song": "Earlier save"}})
+            store.flush()
+        if invalid_edit:
+            path.write_bytes(b"{unfinished hand edit")
+        store.transaction(lambda state: state[collection].pop("delete-me"))
+        store.flush()
+        assert "delete-me" not in store.get()[collection]
+        assert not path.exists()
+        if invalid_edit:
+            assert path.with_name("delete-me.invalid.json").read_bytes() == b"{unfinished hand edit"
+            assert path.with_name("delete-me.invalid.txt").read_text()
+    finally:
+        store.close()
+
+    restarted = Store(tmp_path)
+    try:
+        assert "delete-me" not in restarted.get()[collection]
+        assert not path.exists()
+        if invalid_edit:
+            assert restarted.runtime.status()["stage"]["rejected_" + collection]
+            assert path.with_name("delete-me.invalid.json").read_bytes() == b"{unfinished hand edit"
+    finally:
+        restarted.close()
