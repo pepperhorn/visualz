@@ -9,7 +9,7 @@
 - **Base commit:** 5a1b569 (main with dispatch docs; code base 108ff559be065b8e77b3da644569fd3465f44c17)
 - **Implementation commit:** ca57d57a1346ec4f7fd607805f5eee06593e566a
 - **Port:** 5250 (unused)
-- **Status:** closed (implementation complete; awaiting lead review)
+- **Status:** closed
 
 ## Goal
 Ensure that deleting an overlay, scene or picture set as the first save since startup removes its file and survives restart, preserving invalid hand edits through quarantine.

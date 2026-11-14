@@ -7,7 +7,7 @@
 - **PR:** —
 - **Base commit:** 108ff559be065b8e77b3da644569fd3465f44c17
 - **Port (if running a server):** 5250
-- **Status:** open
+- **Status:** closed
 
 ## Goal
 Review finding F1. `visualz/state/__init__.py` (about line 340) unlinks a per-document file only when `old.stem in old_values`, and `old_values` comes from `self._persisted`, which is `None` until the first flush. So if a deletion is the first save since boot, the file stays on disk and `_read_documents` reloads it at the next start. Fix: also unlink a document file that was loaded at start-up (track the set of files read from disk, e.g. `self._disk_documents`). Invalid hand-edited files must still be quarantined, never deleted: that behaviour must not change.
