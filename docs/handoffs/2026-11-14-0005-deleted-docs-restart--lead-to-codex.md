@@ -39,6 +39,7 @@ None.
 
 ---
 ## Receiver ack
+Codex acknowledges: track valid documents read from disk so deleting an overlay, scene or picture set before the first save removes its file and survives restart. Preserve invalid-edit quarantine and existing persistence contracts. Changes are limited to the two assigned Python files and this task’s handoffs. Add restart and prior-save regression coverage, run the required checks, then push the branch and open a draft PR. No open questions. GBrain: unavailable.
 
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)

@@ -323,3 +323,118 @@ def test_status_cycles_extended_numpy_and_bad_string_are_safe():
     assert snapshot["test"]["extended"] == 0.5
     assert "BrokenString" in snapshot["test"]["broken"]
     json.dumps(snapshot, allow_nan=False)
+
+
+@pytest.mark.parametrize("collection", ["overlays", "scenes", "picture_sets"])
+@pytest.mark.parametrize("earlier_save", [False, True], ids=["first-save", "after-save"])
+@pytest.mark.parametrize("invalid_edit", [False, True], ids=["valid-file", "invalid-edit"])
+def test_deleted_document_stays_deleted_after_restart(
+    tmp_path, collection, earlier_save, invalid_edit
+):
+    seed = Store(tmp_path, debounce=100)
+    state = seed.get()
+    documents = {
+        "overlays": dict(state["overlays"]["lower-third"], id="delete-me"),
+        "scenes": dict(
+            id="delete-me", name="Scene", mode="plasma", modes={}, look=state["settings"]["look"]
+        ),
+        "picture_sets": dict(
+            id="delete-me", name="Pictures", items=[], order="sequential", fit="fill",
+            transition="random", trigger="seconds", interval=30, amount=0.5,
+            camera=dict(
+                enabled=False, device=None, interval=30, keep_count=12, save=False,
+                mirror=False, rotation=0, brightness=0,
+            ),
+        ),
+    }
+    seed.patch({collection: {"delete-me": documents[collection]}})
+    seed.close()
+    path = tmp_path / collection / "delete-me.json"
+    assert path.exists()
+
+    store = Store(tmp_path, debounce=100)
+    try:
+        assert "delete-me" in store.get()[collection]
+        if earlier_save:
+            store.patch({"now_playing": {"song": "Earlier save"}})
+            store.flush()
+        if invalid_edit:
+            path.write_bytes(b"{unfinished hand edit")
+        store.transaction(lambda state: state[collection].pop("delete-me"))
+        store.flush()
+        assert "delete-me" not in store.get()[collection]
+        assert not path.exists()
+        if invalid_edit:
+            assert path.with_name("delete-me.invalid.json").read_bytes() == b"{unfinished hand edit"
+            assert path.with_name("delete-me.invalid.txt").read_text()
+    finally:
+        store.close()
+
+    restarted = Store(tmp_path)
+    try:
+        assert "delete-me" not in restarted.get()[collection]
+        assert not path.exists()
+        if invalid_edit:
+            assert restarted.runtime.status()["stage"]["rejected_" + collection]
+            assert path.with_name("delete-me.invalid.json").read_bytes() == b"{unfinished hand edit"
+    finally:
+        restarted.close()
+
+
+@pytest.mark.parametrize("rename", [False, True], ids=["same-content", "corrected-content"])
+def test_quarantined_overlay_replacement_survives_later_save(tmp_path, rename):
+    import json
+
+    store = Store(tmp_path, debounce=100)
+    path = tmp_path / "overlays/lower-third.json"
+    try:
+        store.flush()
+        original = path.read_bytes()
+        path.write_bytes(b"{unfinished hand edit")
+        store.patch({"overlays": {"title-card": {"name": "Trigger quarantine"}}})
+        store.flush()
+        assert not path.exists()
+        rejected = path.with_name("lower-third.invalid.json")
+        assert rejected.read_bytes() == b"{unfinished hand edit"
+
+        store.transaction(lambda state: state["overlays"].pop("lower-third"))
+        store.flush()
+        corrected = json.loads(original)
+        if rename:
+            corrected["name"] = "Corrected hand edit"
+        content = json.dumps(corrected).encode()
+        path.write_bytes(content)
+        store.patch({"overlays": {"title-card": {"name": "Next save"}}})
+        store.flush()
+        assert path.read_bytes() == content
+        assert rejected.read_bytes() == b"{unfinished hand edit"
+        store.reload_documents()
+        store._pending.join()
+        assert store.get()["overlays"]["lower-third"] == corrected
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("earlier_save", [False, True], ids=["first-save", "after-save"])
+def test_changed_overlay_is_not_deleted_by_flush(tmp_path, earlier_save):
+    import json
+
+    seed = Store(tmp_path)
+    seed.close()
+    path = tmp_path / "overlays/lower-third.json"
+    store = Store(tmp_path, debounce=100)
+    try:
+        if earlier_save:
+            store.flush()
+        edited = dict(store.get()["overlays"]["lower-third"], name="External replacement")
+        content = json.dumps(edited).encode()
+        path.unlink()
+        path.write_bytes(content)
+        store.transaction(lambda state: state["overlays"].pop("lower-third"))
+        store.flush()
+        assert path.read_bytes() == content
+        store.reload_documents()
+        store._pending.join()
+        assert store.get()["overlays"]["lower-third"] == edited
+    finally:
+        store.close()

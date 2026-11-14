@@ -154,6 +154,7 @@ class Store:
         return candidate
 
     def _reject_document(self, file, error):
+        self._disk_documents.pop(file, None)
         logging.warning("Rejected %s %s: %s", file.parent.name, file.name, error)
         invalid = file.with_name(file.stem + ".invalid.json")
         if invalid.exists():
@@ -329,16 +330,19 @@ class Store:
                 for old in directory.glob("*.json"):
                     if self._is_rejected(old) or old in self._rejected_paths:
                         continue
+                    unchanged = old.stem in old_values
                     if collection in ("overlays", "scenes", "picture_sets"):
                         try:
                             value = json.loads(old.read_text())
-                            if value != self._disk_documents.get(old):
+                            unchanged = self._disk_documents.get(old) == value
+                            if not unchanged:
                                 self._document_candidate(old, current, collection)
                         except (ValueError, OSError, TypeError, KeyError) as exc:
                             self._reject_document(old, exc)
                             continue
-                    if old.stem not in current[collection] and old.stem in old_values:
+                    if old.stem not in current[collection] and unchanged:
                         old.unlink()
+                        self._disk_documents.pop(old, None)
                 for key, value in current[collection].items():
                     if directory / f"{key}.json" in self._rejected_paths:
                         continue
