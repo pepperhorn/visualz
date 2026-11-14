@@ -11,7 +11,7 @@
 - **Review round 1 base:** 4587a47f33e23e40d5d5c1aad94baf536102b647; round 1 fixes: 9c2ba57a2b74e885a07a150cf6e3a0452b504d92.
 - **Review round 2 base:** 9c2ba57a2b74e885a07a150cf6e3a0452b504d92; revisions are this branch's following commit.
 - **Port:** 5211
-- **Status:** implementation complete; awaiting cross-family re-review and human hardware gate.
+- **Status:** closed
 
 ## Goal
 Deliver T1's Python foundation. Round 1 findings are confirmed fixed by the round 2 reviewer; this revision addresses all six round 2 lead decisions (B1, S1–S3, M1–M2 and the migration suggestion). The updated spec and plan on `origin/main` were fetched and read without merging main, as directed. This document describes the resulting contracts; it supersedes the earlier return description.

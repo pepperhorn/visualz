@@ -7,7 +7,7 @@
 - **PR:** —
 - **Base commit:** 5f0c2fae8ce4327878357d2721d38a97a34f83bd
 - **Port (if running a server):** 5211
-- **Status:** open
+- **Status:** closed
 
 ## Goal
 Create the Python project for visualz and everything the four later tasks build on: packaging and tooling, the JSON Schemas and defaults for all persistent data, the state store, the embedded web server (REST + WebSocket, uploads, import/export), media ingest, the OpenGL ES 2.0 helper layer, a main loop that shows a test pattern, stub modules with agreed signatures for audio, render, camera, and overlay, and a standalone hardware smoke test script for a Raspberry Pi 2/3. Done means `python -m visualz --window` runs on a Linux desktop, the API works end to end under test, and the verify command passes.
