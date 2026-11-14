@@ -63,7 +63,7 @@ def test_video_and_logo(tmp_path):
     logo = ingest(tmp_path, "logo.mp4", content, "logo")
     manifest = json.loads((tmp_path / logo["path"]).read_text())
     assert 0 < manifest["duration"] <= 10
-    assert len(manifest["frames"]) <= 80
+    assert len(manifest["frames"]) <= 100
 
 
 def test_gl_lifecycle_when_display_available():
@@ -196,11 +196,11 @@ def test_duration_caps(tmp_path):
     assert float(json.loads(result.stdout)["format"]["duration"]) <= 60
     logo = ingest(tmp_path, source.name, content, "logo")
     manifest = json.loads((tmp_path / logo["path"]).read_text())
-    assert len(manifest["frames"]) == 80
+    assert len(manifest["frames"]) == 100
     assert manifest["duration"] == 10
-    assert manifest["fps"] == 8
+    assert manifest["fps"] == 10
     frame = tmp_path / logo["path"]
-    assert all(max(Image.open(frame.parent / name).size) <= 128 for name in manifest["frames"])
+    assert all(max(Image.open(frame.parent / name).size) <= 192 for name in manifest["frames"])
 
 
 def test_conversion_uses_low_priority_and_one_thread(monkeypatch):

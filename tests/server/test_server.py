@@ -265,7 +265,7 @@ async def test_frame_and_font_round_trip_and_no_original_export(api, tmp_path):
     imported = await response.json()
     assert len(store.get()["assets"]) == 2
     loop_path = store.data_dir / imported["logo"]["asset"]
-    assert Image.open(loop_path.parent / "frame-0001.png").size == (128, 128)
+    assert Image.open(loop_path.parent / "frame-0001.png").size == (192, 192)
     (loop_path.parent / "original-large.mp4").write_bytes(b"unreferenced original")
     exported = await (await client.get(f"/api/overlays/{imported['id']}/export")).read()
     with ZipFile(BytesIO(exported)) as archive:
@@ -416,3 +416,143 @@ async def test_b2_rollback_on_publish_failure(api, monkeypatch):
     assert response.status == 400
     assert not [p for p in store.data_dir.rglob("*") if p.is_file()]
     assert not (store.data_dir / "assets").exists()
+
+
+async def receive_type(ws, kind):
+    while True:
+        message = await asyncio.wait_for(ws.receive_json(), 3)
+        if message["type"] == kind:
+            return message
+
+
+async def test_r2_1_telemetry_coercion_survives_tick_failure_and_restart(tmp_path, caplog):
+    import numpy as np
+
+    store = Store(tmp_path)
+
+    class Custom:
+        def __str__(self):
+            return "custom-value"
+
+    values = dict(
+        beat=np.bool_(True),
+        level=np.float32(0.5),
+        spectrum=np.array([1, np.nan, np.inf]),
+        extra=Custom(),
+        pair=(1, 2),
+        tags={3, 4},
+    )
+    store.runtime.publish_status("audio", values)
+    store.runtime.publish_status("audio", values)
+    store.runtime.publish_image(
+        "latest", b"png", "image/png", metadata={"exposure": np.float32(0.25), "object": Custom()}
+    )
+    assert sum("audio.extra" in record.message for record in caplog.records) == 1
+    calls = 0
+
+    def telemetry():
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("tick failure")
+        if calls == 3:
+            raise asyncio.CancelledError("unexpected child exit")
+        # Defensive send-time path also sees fresh, unnormalised worker data.
+        return {"audio": values, "images": store.runtime.status()["images"]}
+
+    try:
+        async with TestClient(TestServer(create_app(store, telemetry))) as client:
+            ws = await client.ws_connect("/ws")
+            first = await receive_type(ws, "telemetry")
+            assert first["audio"]["beat"] is True
+            assert first["audio"]["level"] == 0.5
+            assert first["audio"]["spectrum"] == [1, None, None]
+            assert first["audio"]["extra"] == "custom-value"
+            assert first["images"]["latest"]["exposure"] == 0.25
+            for _ in range(3):
+                assert (await receive_type(ws, "telemetry"))["audio"]["pair"] == [1, 2]
+            assert calls >= 6
+            assert "Telemetry tick failed" in caplog.text
+            assert "restarting" in caplog.text
+            await ws.close()
+    finally:
+        store.close()
+
+
+async def test_r2_3_5_command_ids_results_errors_and_overload(api):
+    import numpy as np
+
+    client, store = api
+    store.runtime.register_command(
+        "test", "value", lambda: {"beat": np.bool_(True), "array": np.array([np.nan, 2])}
+    )
+
+    def fail():
+        raise ValueError("handler failed")
+
+    store.runtime.register_command("test", "fail", fail)
+    response = await client.post(
+        "/api/stage/command",
+        json={"target": "test", "name": "value", "args": {}, "id": "http-command"},
+    )
+    assert await response.json() == {"accepted": True, "id": "http-command"}
+    store.runtime.drain_commands()
+    result = await (await client.get("/api/stage/result/http-command")).json()
+    assert result["id"] == "http-command" and result["value"] == {"beat": True, "array": [None, 2]}
+    await client.post(
+        "/api/stage/command",
+        json={"target": "test", "name": "fail", "args": {}, "id": "http-failure"},
+    )
+    store.runtime.drain_commands()
+    failed = await (await client.get("/api/stage/result/http-failure")).json()
+    assert failed["id"] == "http-failure" and failed["error"] == "handler failed"
+    ws = await client.ws_connect("/ws")
+    await next_state(ws)
+    await ws.send_json(
+        {"type": "command", "target": "test", "name": "fail", "args": {}, "id": "ws-command"}
+    )
+    ack = await receive_type(ws, "command")
+    assert ack["id"] == "ws-command"
+    store.runtime.drain_commands()
+    result = await receive_type(ws, "command_result")
+    assert result["id"] == "ws-command" and result["error"] == "handler failed"
+    for _ in range(128):
+        store.runtime.enqueue_command({"target": "test", "name": "value", "args": {}})
+    overloaded = await client.post(
+        "/api/stage/command", json={"target": "test", "name": "value", "args": {}}
+    )
+    assert overloaded.status == 503 and overloaded.headers["Retry-After"] == "1"
+    assert (
+        await client.post(
+            "/api/stage/command", json={"target": "unknown", "name": "value", "args": {}}
+        )
+    ).status == 400
+    await ws.send_json(
+        {"type": "command", "target": "test", "name": "value", "args": {}, "id": "retry"}
+    )
+    error = await receive_type(ws, "error")
+    assert error["id"] == "retry" and error["status"] == 503
+    await ws.close()
+
+
+async def test_r2_2_high_frame_count_archive_import_and_export(api):
+    client, store = api
+    store.runtime.publish_status("stage", {"hardware_profile": "high"})
+    template = store.get()["overlays"]["logo-bug"]
+    template["logo"] = dict(
+        asset="assets/loop/manifest.json", corner="bottom-right", size=512, margin=20, opacity=1
+    )
+    image = BytesIO()
+    Image.new("RGBA", (1, 1), "red").save(image, "PNG")
+    frames = [f"frame-{n:04d}.png" for n in range(300)]
+    files = {f"assets/loop/{name}": image.getvalue() for name in frames}
+    files["assets/loop/manifest.json"] = json.dumps(dict(fps=30, duration=10, frames=frames))
+    response = await client.post("/api/overlays/import", data=template_archive(template, files))
+    assert response.status == 201
+    imported = await response.json()
+    manifest = json.loads((store.data_dir / imported["logo"]["asset"]).read_text())
+    assert len(manifest["frames"]) == 300 and manifest["fps"] == 30
+    response = await client.get("/api/overlays/" + imported["id"] + "/export")
+    assert response.status == 200
+    with ZipFile(BytesIO(await response.read())) as archive:
+        assert len(archive.namelist()) == 302

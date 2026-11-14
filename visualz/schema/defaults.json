@@ -68,10 +68,10 @@
       "shuffle": false
     },
     "stage": {
-      "width": 1280,
-      "height": 720,
-      "render_width": 480,
-      "render_height": 270
+      "width": "auto",
+      "height": "auto",
+      "render_width": "auto",
+      "render_height": "auto"
     },
     "source_asset": null,
     "picture_set": null,
@@ -83,35 +83,35 @@
     "modes": {
       "pixel-eye": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "kaleido": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "prism": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "liquid": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "opart": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "plasma": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "chromascope": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       },
       "gallery": {
         "params": {},
-        "quality": "medium"
+        "quality": "auto"
       }
     },
     "hardware_profile": "auto"
@@ -195,5 +195,6 @@
     "extra": ""
   },
   "active_scene": null,
-  "active_overlay": null
+  "active_overlay": null,
+  "schema_version": 1
 }

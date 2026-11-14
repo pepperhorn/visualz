@@ -66,6 +66,9 @@ def test_main_loop_commands_status_and_restart(tmp_path):
         assert status["stage"]["gl_renderer"]
         assert status["stage"]["resolution"] == [320, 180]
         assert status["stage"]["hostname"]
+        assert status["stage"]["control_port"] == 5211
+        assert status["stage"]["control_urls"][0].endswith(".local:5211/control")
+        assert len(status["stage"]["control_urls"]) == len(status["stage"]["ip_addresses"]) + 1
         assert isinstance(status["stage"]["ip_addresses"], list)
         assert status["camera"]["present"] is False
         command("stage", "blackout", {"enabled": True})

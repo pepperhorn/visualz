@@ -16,6 +16,8 @@ from visualz.overlay import Overlay
 from visualz.render import Engine
 from visualz.server import Server
 from visualz.state import Store
+from visualz.schema.profiles import stage_size
+from visualz.media import register_commands
 
 
 def size_arg(value):
@@ -55,8 +57,8 @@ def main():
             for worker in (audio, camera):
                 cleanup.callback(worker.close)
                 worker.start()
-            stage = store.snapshot()["settings"]["stage"]
-            context = Context(args.size or (stage["width"], stage["height"]), args.window)
+            context = Context(args.size or stage_size(store.snapshot()["settings"]), args.window)
+            register_commands(store)
             cleanup.callback(context.close)
             engine = Engine(context, store, audio, camera)
             cleanup.callback(engine.close)
@@ -112,6 +114,14 @@ def main():
                     resolution=list(context.size),
                     hostname=hostname,
                     ip_addresses=addresses,
+                    control_port=args.port,
+                    control_urls=[
+                        f"http://{hostname.removesuffix('.local')}.local:{args.port}/control"
+                    ]
+                    + [
+                        f"http://{'[' + address + ']' if ':' in address else address}:{args.port}/control"
+                        for address in addresses
+                    ],
                 ),
             )
             server = Server(store, args.port)

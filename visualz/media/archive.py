@@ -2,6 +2,7 @@
 
 import json
 import math
+from visualz.schema.profiles import media_options, archive_limit
 import shutil
 from pathlib import Path, PurePosixPath
 from tempfile import TemporaryDirectory
@@ -11,7 +12,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from visualz.media import MAX_UPLOAD, ingest
+from visualz.media import ingest
 from visualz.schema import validate
 
 
@@ -50,11 +51,14 @@ def loop_manifest(content):
 
 def import_archive(store, payload):
     root = store.data_dir
+    limits = media_options(store.snapshot()["settings"], store.runtime)
     with TemporaryDirectory(prefix="visualz-import-") as temporary:
         staging = Path(temporary)
         with ZipFile(BytesIO(payload)) as archive:
             members = archive.infolist()
-            if len(members) > 300 or sum(m.file_size for m in members) > MAX_UPLOAD:
+            if len(members) > 512 or sum(m.file_size for m in members) > archive_limit(
+                store.snapshot()["settings"], store.runtime
+            ):
                 raise ValueError("Archive exceeds expanded size or file count limit")
             if len({m.filename for m in members}) != len(members):
                 raise ValueError("Duplicate archive entries")
@@ -82,7 +86,7 @@ def import_archive(store, payload):
                 else:
                     raise ValueError("Unsupported archive asset type")
                 assets[member.filename] = ingest(
-                    staging, PurePosixPath(member.filename).name, content, kind
+                    staging, PurePosixPath(member.filename).name, content, kind, **limits
                 )
             for name, manifest in manifests.items():
                 directory = staging / "assets" / uuid4().hex
@@ -95,8 +99,21 @@ def import_archive(store, payload):
                     with Image.open(source) as image:
                         if image.format != "PNG":
                             raise ValueError("Logo frames must be PNG")
-                        image.thumbnail((128, 128))
+                        image.thumbnail((limits["logo_size"], limits["logo_size"]))
                         image.convert("RGBA").save(directory / frame)
+                step = max(
+                    1,
+                    math.ceil(manifest["fps"] / limits["logo_fps"]),
+                    math.ceil(len(manifest["frames"]) / limits["logo_frames"]),
+                )
+                kept = manifest["frames"][::step]
+                for frame in set(manifest["frames"]) - set(kept):
+                    (directory / frame).unlink()
+                manifest = dict(
+                    fps=manifest["fps"] / step,
+                    duration=len(kept) / (manifest["fps"] / step),
+                    frames=kept,
+                )
                 path = directory / "manifest.json"
                 path.write_text(json.dumps(manifest))
                 assets[name] = dict(

@@ -180,6 +180,7 @@
           },
           "quality": {
             "enum": [
+              "auto",
               "low",
               "medium",
               "high"

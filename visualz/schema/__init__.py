@@ -1,7 +1,10 @@
 """Published JSON contracts; colours use #RRGGBB[AA] or @theme-name.
 
 Channel indices are zero-based. Sizes/offsets are output pixels; times are seconds
-unless named minutes. Partial objects are merged before validating the full state.
+unless named minutes. Stage dimensions and modes.*.quality accept 'auto',
+meaning use the resolved profile default from schema.profiles (unknown detection
+falls back to low). State carries schema_version; schema.migrations runs on load.
+Partial objects are merged before validating the full state.
 """
 
 import json

@@ -14,6 +14,7 @@ queue. See visualz.state.runtime for the initial command/status contract.
 
 import asyncio
 import json
+import logging
 import sysconfig
 import threading
 import shutil
@@ -32,13 +33,25 @@ from visualz.media.archive import (
     loop_manifest,
 )
 from visualz.schema import SCHEMAS, validate
+from visualz.schema.profiles import media_options, archive_limit
 from visualz.state import COLLECTIONS, merge
+from visualz.state.runtime import CommandQueueFull
 
 
 @web.middleware
 async def errors(request, handler):
     try:
         return await handler(request)
+    except CommandQueueFull as exc:
+        try:
+            body = await request.json()
+        except (ValueError, TypeError):
+            body = {}
+        return web.json_response(
+            {"error": str(exc), "id": body.get("id") if isinstance(body, dict) else None},
+            status=503,
+            headers={"Retry-After": "1"},
+        )
     except FileNotFoundError as exc:
         raise web.HTTPNotFound(text="Asset file not found") from exc
     except (ValueError, KeyError, TypeError, BadZipFile) as exc:
@@ -54,10 +67,18 @@ def create_app(store, telemetry=None, web_dir=None):
 
     async def send(ws, message):
         try:
-            await asyncio.wait_for(ws.send_json(message), 0.5)
+            await asyncio.wait_for(
+                ws.send_json(
+                    store.runtime.coerce(message, "send"),
+                    dumps=lambda value: json.dumps(value, allow_nan=False),
+                ),
+                0.5,
+            )
         except (ConnectionError, RuntimeError, asyncio.TimeoutError):
             clients.discard(ws)
             asyncio.create_task(ws.close())
+        except Exception:
+            logging.exception("Failed to send client message; keeping stream alive")
 
     async def broadcast(message):
         await asyncio.gather(*(send(ws, message) for ws in tuple(clients)))
@@ -77,14 +98,41 @@ def create_app(store, telemetry=None, web_dir=None):
             while True:
                 await event.wait()
                 event.clear()
-                await broadcast({"type": "state", "state": pending[0]})
+                try:
+                    await broadcast({"type": "state", "state": pending[0]})
+                except Exception:
+                    logging.exception("State broadcast failed; continuing")
 
         async def meters():
             while True:
                 await asyncio.sleep(0.1)
-                await broadcast({"type": "telemetry", **telemetry()})
+                try:
+                    await broadcast(
+                        {"type": "telemetry", **store.runtime.coerce(telemetry(), "telemetry")}
+                    )
+                except Exception:
+                    logging.exception("Telemetry tick failed; continuing")
 
-        tasks = [asyncio.create_task(states()), asyncio.create_task(meters())]
+        async def supervise(name, factory):
+            while True:
+                child = asyncio.create_task(factory())
+                try:
+                    await child
+                    logging.error("%s task exited; restarting", name)
+                except asyncio.CancelledError:
+                    if asyncio.current_task().cancelling():
+                        child.cancel()
+                        await asyncio.gather(child, return_exceptions=True)
+                        raise
+                    logging.warning("%s task cancelled unexpectedly; restarting", name)
+                except Exception:
+                    logging.exception("%s task failed; restarting", name)
+                await asyncio.sleep(0.01)
+
+        tasks = [
+            asyncio.create_task(supervise("states", states)),
+            asyncio.create_task(supervise("telemetry", meters)),
+        ]
         yield
         unsubscribe()
         for task in tasks:
@@ -225,19 +273,47 @@ def create_app(store, telemetry=None, web_dir=None):
             await ws.send_json({"type": "state", "state": store.get()})
             async for msg in ws:
                 if msg.type == WSMsgType.TEXT:
+                    body = None
                     try:
                         body = json.loads(msg.data)
                         if body.get("type") == "command":
-                            store.runtime.enqueue_command(
-                                {k: v for k, v in body.items() if k != "type"}
+                            loop = asyncio.get_running_loop()
+
+                            def result_ready(result):
+                                loop.call_soon_threadsafe(
+                                    lambda: asyncio.create_task(
+                                        send(ws, {"type": "command_result", **result})
+                                    )
+                                )
+
+                            ack = store.runtime.enqueue_command(
+                                {k: v for k, v in body.items() if k != "type"}, result_ready
                             )
-                            await ws.send_json({"type": "command", "accepted": True})
+                            await send(ws, {"type": "command", **ack})
                         elif body.get("type") == "patch":
                             store.patch(body["patch"])
                         else:
                             raise ValueError("Expected patch or command message")
+                    except CommandQueueFull as exc:
+                        await send(
+                            ws,
+                            {
+                                "type": "error",
+                                "error": str(exc),
+                                "status": 503,
+                                "retry_after": 1,
+                                "id": body.get("id") if isinstance(body, dict) else None,
+                            },
+                        )
                     except (ValueError, KeyError, TypeError, AttributeError) as exc:
-                        await ws.send_json({"type": "error", "error": str(exc)})
+                        await send(
+                            ws,
+                            {
+                                "type": "error",
+                                "error": store.runtime.coerce(exc, "command.error"),
+                                "id": body.get("id") if isinstance(body, dict) else None,
+                            },
+                        )
         finally:
             clients.discard(ws)
         return ws
@@ -253,7 +329,12 @@ def create_app(store, telemetry=None, web_dir=None):
             if len(content) > MAX_UPLOAD:
                 raise web.HTTPRequestEntityTooLarge(max_size=MAX_UPLOAD, actual_size=len(content))
         asset = await asyncio.to_thread(
-            ingest, root, part.filename, bytes(content), request.query.get("kind", "image")
+            ingest,
+            root,
+            part.filename,
+            bytes(content),
+            request.query.get("kind", "image"),
+            **media_options(store.snapshot()["settings"], store.runtime),
         )
         store.patch({"assets": {asset["id"]: asset}})
         return web.json_response(asset, status=201)
@@ -282,8 +363,12 @@ def create_app(store, telemetry=None, web_dir=None):
         return web.Response(body=output.getvalue(), content_type="application/zip")
 
     async def import_template(request):
-        payload = await request.read()
-
+        limit = archive_limit(store.snapshot()["settings"], store.runtime)
+        payload = bytearray()
+        async for chunk in request.content.iter_chunked(64 * 1024):
+            payload.extend(chunk)
+            if len(payload) > limit:
+                raise web.HTTPRequestEntityTooLarge(max_size=limit, actual_size=len(payload))
         return web.json_response(
             await asyncio.to_thread(import_archive, store, payload), status=201
         )
@@ -300,11 +385,24 @@ def create_app(store, telemetry=None, web_dir=None):
         return web.Response(body=output.getvalue(), content_type="image/png")
 
     async def stage_command(request):
-        store.runtime.enqueue_command(await request.json())
-        return web.json_response({"accepted": True}, status=202)
+        ack = store.runtime.enqueue_command(await request.json())
+        return web.json_response(ack, status=202)
+
+    async def command_result(request):
+        key = request.match_info["id"]
+        # HTTP paths are strings; permit integer correlation ids too.
+        result = store.runtime.command_result(key)
+        if result is None:
+            try:
+                result = store.runtime.command_result(int(key))
+            except ValueError:
+                pass
+        if result is None:
+            raise web.HTTPNotFound(text="Command result is not available")
+        return web.json_response(store.runtime.coerce(result, "command_result"))
 
     async def stage_status(request):
-        return web.json_response(store.runtime.status())
+        return web.json_response(store.runtime.coerce(store.runtime.status(), "status"))
 
     async def stage_image(request):
         result = store.runtime.image(request.match_info["name"])
@@ -333,6 +431,7 @@ def create_app(store, telemetry=None, web_dir=None):
     async def index(request):
         return web.FileResponse(static / "index.html")
 
+    app.router.add_get("/api/stage/result/{id}", command_result)
     app.router.add_get("/api/stage/status", stage_status)
     app.router.add_post("/api/stage/command", stage_command)
     app.router.add_get("/api/stage/image/{name}", stage_image)

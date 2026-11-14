@@ -264,24 +264,52 @@
       "type": "object",
       "properties": {
         "width": {
-          "type": "integer",
-          "minimum": 64,
-          "maximum": 1920
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 1920
+            },
+            {
+              "const": "auto"
+            }
+          ]
         },
         "height": {
-          "type": "integer",
-          "minimum": 64,
-          "maximum": 1080
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 1080
+            },
+            {
+              "const": "auto"
+            }
+          ]
         },
         "render_width": {
-          "type": "integer",
-          "minimum": 64,
-          "maximum": 1280
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 1920
+            },
+            {
+              "const": "auto"
+            }
+          ]
         },
         "render_height": {
-          "type": "integer",
-          "minimum": 64,
-          "maximum": 720
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 64,
+              "maximum": 1080
+            },
+            {
+              "const": "auto"
+            }
+          ]
         }
       },
       "required": [
@@ -351,6 +379,7 @@
           },
           "quality": {
             "enum": [
+              "auto",
               "low",
               "medium",
               "high"

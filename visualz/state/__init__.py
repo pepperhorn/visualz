@@ -15,6 +15,7 @@ from threading import RLock, Timer
 from types import MappingProxyType
 
 from visualz.schema import defaults, validate
+from visualz.schema.migrations import migrate, SCHEMA_VERSION
 
 COLLECTIONS = {
     "scenes": "scene",
@@ -90,6 +91,9 @@ class Store:
         self._last_good = None
         self._persisted = None
         self._data = defaults()
+        self._document_lock = Lock()
+        self._rejected_paths = set()
+        self._disk_documents = {}
         recovered = False
         for name in ("state.json", "state.json.bak"):
             path = self.data_dir / name
@@ -99,7 +103,7 @@ class Store:
                 continue
             try:
                 raw = path.read_bytes()
-                candidate = json.loads(raw)
+                candidate = migrate(json.loads(raw))
                 self._validate(candidate)
                 self._data, self._last_good = candidate, raw
                 break
@@ -113,25 +117,85 @@ class Store:
         self.runtime.publish_status("stage", {"state_recovered": recovered})
         if recovered:
             logging.warning("State recovered from backup or defaults")
-        for file in (self.data_dir / "overlays").glob("*.json"):
-            try:
-                template = validate("overlay", json.loads(file.read_text()))
-                if template["id"] != file.stem:
-                    raise ValueError("template filename must match id")
-                candidate = deepcopy(self._data)
-                candidate["overlays"][template["id"]] = template
-                self._validate(candidate)
-                self._data = candidate
-            except (ValueError, OSError, TypeError, KeyError) as exc:
-                logging.warning("Rejected overlay %s: %s", file.name, exc)
+        self._data = self._read_documents(self._data)
         self._snapshot = freeze(self._data)
         self._pending = Queue()
         self._worker = Thread(target=self._apply_pending, daemon=True)
         self._worker.start()
+        self.runtime.register_command("overlays", "reload", self.reload_documents)
+
+    @staticmethod
+    def _is_rejected(path):
+        return ".invalid" in path.stem
+
+    def _read_documents(self, state):
+        """Preserve all rejected edits, including earlier ones, and expose errors."""
+        state = deepcopy(state)
+        for collection in ("picture_sets", "scenes", "overlays"):
+            directory = self.data_dir / collection
+            for file in sorted(directory.glob("*.json")):
+                if self._is_rejected(file):
+                    continue
+                try:
+                    state = self._document_candidate(file, state, collection)
+                    self._disk_documents[file] = state[collection][file.stem]
+                except (ValueError, OSError, TypeError, KeyError) as exc:
+                    self._reject_document(file, exc)
+            self._publish_rejections(collection)
+        return state
+
+    def _document_candidate(self, file, state, collection):
+        value = validate(COLLECTIONS[collection], json.loads(file.read_text()))
+        if value["id"] != file.stem:
+            raise ValueError("Document filename must match id")
+        candidate = deepcopy(state)
+        candidate[collection][value["id"]] = value
+        self._validate(candidate)
+        return candidate
+
+    def _reject_document(self, file, error):
+        logging.warning("Rejected %s %s: %s", file.parent.name, file.name, error)
+        invalid = file.with_name(file.stem + ".invalid.json")
+        if invalid.exists():
+            invalid = file.with_name(f"{file.stem}.invalid-{time.time_ns()}.json")
+        try:
+            file.rename(invalid)
+            invalid.with_suffix(".txt").write_text(str(error))
+        except OSError:
+            self._rejected_paths.add(file)
+            logging.exception("Could not quarantine rejected hand edit; protecting original")
+
+    def _publish_rejections(self, collection):
+        directory = self.data_dir / collection
+        problems = []
+        for invalid in sorted(directory.glob("*.invalid*.json")):
+            error = invalid.with_suffix(".txt")
+            try:
+                message = error.read_text() if error.exists() else "Rejected hand edit; see log"
+            except OSError:
+                message = "Cannot read rejection details; see log"
+            problems.append(dict(file=invalid.name, error=message))
+        problems.extend(
+            dict(file=p.name, error="Could not quarantine rejected hand edit; see log")
+            for p in self._rejected_paths
+            if p.parent == directory
+        )
+        self.runtime.publish_status("stage", {"rejected_" + collection: problems})
+
+    def reload_documents(self):
+        """Command handler: hand disk work to Store's existing background worker."""
+        self._pending.put_nowait("reload_documents")
+        return {"queued": True}
 
     def _validate(self, state, previous=None):
         if not isinstance(state, dict) or set(state) != set(defaults()):
             raise ValueError("state: unknown or missing root fields")
+        if state["schema_version"] != SCHEMA_VERSION or type(state["schema_version"]) is not int:
+            raise ValueError("Unsupported schema_version")
+        try:
+            json.dumps(state, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"State must contain finite JSON values: {exc}") from exc
         for key in ("settings", "now_playing"):
             if previous is None or state[key] != previous[key]:
                 validate(key, state[key])
@@ -208,13 +272,37 @@ class Store:
             raise RuntimeError("store is closing")
         self._pending.put_nowait(deepcopy(patch))
 
+    def submit_task(self, work):
+        """Queue a short-lived background job; close drains jobs before flushing."""
+        if not self._accepting:
+            raise RuntimeError("store is closing")
+        self._pending.put_nowait(work)
+
     def _apply_pending(self):
         while True:
             patch = self._pending.get()
             try:
                 if patch is None:
                     return
-                self.patch(patch)
+                if callable(patch):
+                    patch()
+                elif patch == "reload_documents":
+                    with self._document_lock:
+                        # Serialize reload/flush disk access, but only load touched
+                        # document values into a fresh transaction at commit time.
+                        with self._flush_lock:
+                            before = self.get()
+                            loaded = self._read_documents(before)
+
+                            def apply(state):
+                                for collection in ("picture_sets", "scenes", "overlays"):
+                                    for key, value in loaded[collection].items():
+                                        if before[collection].get(key) != value:
+                                            state[collection][key] = value
+
+                            self.transaction(apply)
+                else:
+                    self.patch(patch)
             except Exception as exc:
                 self.runtime.publish_status("state", {"error": str(exc)})
             finally:
@@ -239,13 +327,27 @@ class Store:
                 directory.mkdir(exist_ok=True)
                 old_values = previous.get(collection, {})
                 for old in directory.glob("*.json"):
-                    if old.stem not in current[collection]:
+                    if self._is_rejected(old) or old in self._rejected_paths:
+                        continue
+                    if collection in ("overlays", "scenes", "picture_sets"):
+                        try:
+                            value = json.loads(old.read_text())
+                            if value != self._disk_documents.get(old):
+                                self._document_candidate(old, current, collection)
+                        except (ValueError, OSError, TypeError, KeyError) as exc:
+                            self._reject_document(old, exc)
+                            continue
+                    if old.stem not in current[collection] and old.stem in old_values:
                         old.unlink()
                 for key, value in current[collection].items():
+                    if directory / f"{key}.json" in self._rejected_paths:
+                        continue
                     if old_values.get(key) != value:
-                        atomic_write(
-                            directory / f"{key}.json", json.dumps(value, indent=2).encode()
-                        )
+                        path = directory / f"{key}.json"
+                        atomic_write(path, json.dumps(value, indent=2).encode())
+                        self._disk_documents[path] = value
+                if collection in ("overlays", "scenes", "picture_sets"):
+                    self._publish_rejections(collection)
             if current["settings"] != previous.get("settings"):
                 atomic_write(
                     self.data_dir / "settings.json", json.dumps(current["settings"]).encode()
