@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 import time
 from queue import Queue
 from threading import Lock, Thread
@@ -117,18 +118,24 @@ class Store:
         self.runtime.publish_status("stage", {"state_recovered": recovered})
         if recovered:
             logging.warning("State recovered from backup or defaults")
-        self._data = self._read_documents(self._data)
+        self._data = self._read_documents(self._data, self._disk_documents)
+        self._document_values = {
+            (collection, key): value
+            for collection in ("overlays", "scenes", "picture_sets")
+            for key, value in self._data[collection].items()
+        }
         self._snapshot = freeze(self._data)
         self._pending = Queue()
         self._worker = Thread(target=self._apply_pending, daemon=True)
         self._worker.start()
         self.runtime.register_command("overlays", "reload", self.reload_documents)
+        self.runtime.register_command("overlays", "dismiss_rejected", self.dismiss_rejected)
 
     @staticmethod
     def _is_rejected(path):
         return ".invalid" in path.stem
 
-    def _read_documents(self, state):
+    def _read_documents(self, state, documents):
         """Preserve all rejected edits, including earlier ones, and expose errors."""
         state = deepcopy(state)
         for collection in ("picture_sets", "scenes", "overlays"):
@@ -138,10 +145,11 @@ class Store:
                     continue
                 try:
                     state = self._document_candidate(file, state, collection)
-                    self._disk_documents[file] = state[collection][file.stem]
+                    documents[file] = state[collection][file.stem]
                 except (ValueError, OSError, TypeError, KeyError) as exc:
+                    documents.pop(file, None)
                     self._reject_document(file, exc)
-            self._publish_rejections(collection)
+            self._publish_rejections(collection, state)
         return state
 
     def _document_candidate(self, file, state, collection):
@@ -166,22 +174,59 @@ class Store:
             self._rejected_paths.add(file)
             logging.exception("Could not quarantine rejected hand edit; protecting original")
 
-    def _publish_rejections(self, collection):
-        directory = self.data_dir / collection
-        problems = []
-        for invalid in sorted(directory.glob("*.invalid*.json")):
-            error = invalid.with_suffix(".txt")
-            try:
-                message = error.read_text() if error.exists() else "Rejected hand edit; see log"
-            except OSError:
-                message = "Cannot read rejection details; see log"
-            problems.append(dict(file=invalid.name, error=message))
-        problems.extend(
-            dict(file=p.name, error="Could not quarantine rejected hand edit; see log")
-            for p in self._rejected_paths
-            if p.parent == directory
-        )
-        self.runtime.publish_status("stage", {"rejected_" + collection: problems})
+    def _publish_rejections(self, collection, state=None):
+        # Rejection reporting is best effort: it must never prevent startup.
+        try:
+            directory = self.data_dir / collection
+            files = set(directory.glob("*.invalid*.json"))
+            files.update(p for p in self._rejected_paths if p.parent == directory)
+            newest = sorted(files, key=lambda p: (p.stat().st_mtime_ns, p.name), reverse=True)
+            problems = []
+            if state is None:
+                state = self.get() if hasattr(self, "_snapshot") else self._data
+            for invalid in newest[:50]:
+                try:
+                    with invalid.with_suffix(".txt").open() as note:
+                        message = note.read(1024)
+                except (OSError, UnicodeError):
+                    message = "Rejected hand edit; see log"
+                resolved = False
+                live = directory / (invalid.name.split(".invalid", 1)[0] + ".json")
+                try:
+                    self._document_candidate(live, state, collection)
+                    resolved = True
+                except (ValueError, OSError, TypeError, KeyError):
+                    pass
+                problems.append(dict(file=invalid.name, error=message, resolved=resolved))
+            self.runtime.publish_status("stage", {
+                "rejected_" + collection: problems,
+                "rejected_" + collection + "_total": len(files),
+            })
+        except Exception:
+            logging.exception("Could not publish rejected %s files", collection)
+
+    def dismiss_rejected(self, collection, file):
+        """Validate the name on the render thread; do all disk work on the worker."""
+        if collection not in ("overlays", "scenes", "picture_sets"):
+            raise ValueError("Unknown document collection")
+        if not isinstance(file, str) or not re.fullmatch(
+            r"[a-zA-Z0-9_-]{1,100}\.invalid(?:-[0-9]+)?\.json", file
+        ):
+            raise ValueError("Expected a quarantine filename without a path")
+
+        def dismiss():
+            with self._flush_lock:
+                directory = self.data_dir / collection
+                if directory.resolve() != self.data_dir.resolve() / collection:
+                    raise ValueError("Collection directory must not be a symlink")
+                path = directory / file
+                # unlink removes a symlink itself, never its target.
+                path.unlink()
+                path.with_suffix(".txt").unlink(missing_ok=True)
+                self._publish_rejections(collection)
+
+        self.submit_task(dismiss)
+        return {"queued": True}
 
     def reload_documents(self):
         """Command handler: hand disk work to Store's existing background worker."""
@@ -244,8 +289,11 @@ class Store:
         return unsubscribe
 
     def transaction(self, change):
+        return self._transaction(change)
+
+    def _transaction(self, change, closing=False):
         with self._lock:
-            if self._closed:
+            if self._closed and not closing:
                 raise RuntimeError("store is closed")
             candidate = deepcopy(self._data)
             change(candidate)
@@ -254,9 +302,10 @@ class Store:
             self._snapshot = freeze(candidate)
             if self._timer:
                 self._timer.cancel()
-            self._timer = Timer(self.debounce, self.flush)
-            self._timer.daemon = True
-            self._timer.start()
+            if not self._closed:
+                self._timer = Timer(self.debounce, self.flush)
+                self._timer.daemon = True
+                self._timer.start()
             for callback in tuple(self._listeners):
                 try:
                     callback(deepcopy(candidate))
@@ -293,7 +342,8 @@ class Store:
                         # document values into a fresh transaction at commit time.
                         with self._flush_lock:
                             before = self.get()
-                            loaded = self._read_documents(before)
+                            documents = dict(self._disk_documents)
+                            loaded = self._read_documents(before, documents)
 
                             def apply(state):
                                 for collection in ("picture_sets", "scenes", "overlays"):
@@ -302,6 +352,11 @@ class Store:
                                             state[collection][key] = value
 
                             self.transaction(apply)
+                            self._disk_documents = documents
+                            for file, value in documents.items():
+                                self._document_values[file.parent.name, file.stem] = value
+                            for collection in ("picture_sets", "scenes", "overlays"):
+                                self._publish_rejections(collection)
                 else:
                     self.patch(patch)
             except Exception as exc:
@@ -315,11 +370,6 @@ class Store:
                 current = self._data  # Published dictionaries are never mutated again.
             if current == self._persisted:
                 return
-            encoded = json.dumps(current, indent=2).encode()
-            if self._last_good is not None:
-                atomic_write(self.data_dir / "state.json.bak", self._last_good)
-            atomic_write(self.data_dir / "state.json", encoded)
-            self._last_good = encoded
             previous = self._persisted or {}
             for collection in COLLECTIONS:
                 if current[collection] == previous.get(collection):
@@ -327,31 +377,66 @@ class Store:
                 directory = self.data_dir / collection
                 directory.mkdir(exist_ok=True)
                 old_values = previous.get(collection, {})
+                documents = collection in ("overlays", "scenes", "picture_sets")
+                skip = set()
                 for old in directory.glob("*.json"):
                     if self._is_rejected(old) or old in self._rejected_paths:
                         continue
                     unchanged = old.stem in old_values
-                    if collection in ("overlays", "scenes", "picture_sets"):
+                    if documents:
                         try:
                             value = json.loads(old.read_text())
                             unchanged = self._disk_documents.get(old) == value
                             if not unchanged:
-                                self._document_candidate(old, current, collection)
+                                candidate = self._document_candidate(old, current, collection)
+                                memory = current[collection].get(old.stem)
+                                baseline = self._document_values.get((collection, old.stem))
+                                if memory is not None and memory != baseline:
+                                    self._reject_document(old, ValueError(
+                                        "Hand edit conflicted with an in-memory change; "
+                                        "the in-memory value was kept"
+                                    ))
+                                elif memory is not None:
+                                    # Apply only if a concurrent writer has not changed this id.
+                                    def adopt(state):
+                                        if state[collection].get(old.stem) == memory:
+                                            state[collection][old.stem] = candidate[collection][old.stem]
+
+                                    committed = self._transaction(adopt, closing=True)
+                                    if committed[collection].get(old.stem) == value:
+                                        current = deepcopy(current)
+                                        current[collection][old.stem] = value
+                                        self._disk_documents[old] = value
+                                        self._document_values[collection, old.stem] = value
                         except (ValueError, OSError, TypeError, KeyError) as exc:
                             self._reject_document(old, exc)
+                            skip.add(old.stem)
                             continue
                     if old.stem not in current[collection] and unchanged:
                         old.unlink()
                         self._disk_documents.pop(old, None)
+                        self._document_values.pop((collection, old.stem), None)
                 for key, value in current[collection].items():
-                    if directory / f"{key}.json" in self._rejected_paths:
+                    path = directory / f"{key}.json"
+                    if path in self._rejected_paths or key in skip:
                         continue
-                    if old_values.get(key) != value:
-                        path = directory / f"{key}.json"
+                    baseline = (self._document_values.get((collection, key)) if documents
+                                else old_values.get(key))
+                    if baseline != value or (documents and not path.exists()
+                                             and path not in self._disk_documents
+                                             and key not in old_values
+                                             and self._persisted is None):
                         atomic_write(path, json.dumps(value, indent=2).encode())
                         self._disk_documents[path] = value
-                if collection in ("overlays", "scenes", "picture_sets"):
+                        if documents:
+                            self._document_values[collection, key] = value
+                if documents:
                     self._publish_rejections(collection)
+            encoded = json.dumps(current, indent=2).encode()
+            if self._last_good is not None:
+                atomic_write(self.data_dir / "state.json.bak", self._last_good)
+            atomic_write(self.data_dir / "state.json", encoded)
+            self._last_good = encoded
             if current["settings"] != previous.get("settings"):
                 atomic_write(
                     self.data_dir / "settings.json", json.dumps(current["settings"]).encode()
