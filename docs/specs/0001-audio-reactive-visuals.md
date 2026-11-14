@@ -1,6 +1,6 @@
 # 0001 — Audio-reactive visuals for live shows (v1)
 
-- **Status:** draft
+- **Status:** approved (human, 2026-11-14)
 - **Ledger:** 0001 · **Plan:** ../plans/0001-audio-reactive-visuals.md
 - **Author:** lead · **Date:** 2026-11-14
 
