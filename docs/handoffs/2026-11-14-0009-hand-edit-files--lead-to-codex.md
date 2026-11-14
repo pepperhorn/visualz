@@ -7,7 +7,7 @@
 - **PR:** —
 - **Base commit:** e98f86845036cf453750b67324216337dac8c57b
 - **Port (if running a server):** 5290
-- **Status:** open
+- **Status:** closed
 
 ## Goal
 Four related fixes in the Store's handling of per-document files (overlays, scenes, picture sets), all in `visualz/state/__init__.py`:
