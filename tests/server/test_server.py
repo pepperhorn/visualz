@@ -649,3 +649,70 @@ async def test_bad_image_metadata_does_not_break_telemetry(api):
     assert (await client.get("/api/stage/status")).status == 200
     assert store.runtime.image("latest")[0] == b"previous"
     await ws.close()
+
+
+@pytest.mark.parametrize("depth", [500, 2000])
+async def test_deep_commands_rejected_http_and_ws_without_disconnect(api, depth):
+    client, store = api
+    calls = []
+    store.runtime.register_command("test", "echo", lambda value: calls.append(value))
+    # Construct JSON directly so the client's encoder recursion limit is irrelevant.
+    payload = ('{"type":"command","id":"deep","target":"test","name":"echo",'
+               '"args":{"value":' + '[' * depth + '0' + ']' * depth + '}}')
+    response = await client.post(
+        "/api/stage/command", data=payload.replace('"type":"command",', "", 1)
+    )
+    assert response.status == 400
+    assert "nesting" in (await response.json())["error"].lower()
+    assert store.runtime._commands.empty()
+    ws = await client.ws_connect("/ws")
+    await next_state(ws)
+    await ws.send_str(payload)
+    error = await receive_type(ws, "error")
+    assert error["id"] == ("deep" if depth == 500 else None)
+    assert "nesting" in error["error"].lower() or "recursion" in error["error"].lower()
+    assert store.runtime._commands.empty()
+    assert store.runtime.command_result("deep") is None
+    assert not calls
+    await ws.send_json({
+        "type": "command", "id": "after-deep", "target": "test", "name": "echo",
+        "args": {"value": "ok"},
+    })
+    assert (await receive_type(ws, "command"))["id"] == "after-deep"
+    store.runtime.drain_commands()
+    assert (await receive_type(ws, "command_result"))["value"] is None
+    assert calls == ["ok"]
+    await ws.close()
+
+
+@pytest.mark.parametrize("value", ["x" * 900_000, "é" * 40_000])
+async def test_ws_command_byte_cap_keeps_other_message_limits_and_connection(api, value):
+    from visualz.server import MAX_COMMAND_BODY
+
+    client, store = api
+    calls = []
+    store.runtime.register_command("test", "echo", lambda value: calls.append(value))
+    message = {
+        "type": "command", "id": "big-string", "target": "test", "name": "echo",
+        "args": {"value": value},
+    }
+    payload = json.dumps(message, ensure_ascii=False)
+    response = await client.post("/api/stage/command", data=payload.encode())
+    assert response.status == 413
+    ws = await client.ws_connect("/ws")
+    await next_state(ws)
+    await ws.send_str(payload)
+    error = await receive_type(ws, "error")
+    assert error["id"] == "big-string"
+    assert str(MAX_COMMAND_BODY) in error["error"]
+    assert store.runtime._commands.empty()
+    assert store.runtime.command_result("big-string") is None
+    assert not calls
+    # A patch frame of the same size retains the original, larger WS allowance.
+    await ws.send_str(json.dumps({
+        "type": "patch", "patch": {"now_playing": {"song": "after-big-command"}},
+        "padding": value,
+    }, ensure_ascii=False))
+    assert (await next_state(ws))["now_playing"]["song"] == "after-big-command"
+    assert not ws.closed
+    await ws.close()

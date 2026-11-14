@@ -285,14 +285,20 @@ def test_oversized_command_rejected_before_copy_or_queue():
     assert runtime.command_result("oversized") is None
 
 
-def test_oversized_image_metadata_rejected_quickly_and_atomically():
+def test_oversized_image_metadata_rejected_before_conversion_and_atomically():
     runtime = Runtime()
     runtime.publish_image("latest", b"previous", metadata={"sequence": 1})
     before = runtime.status()
-    started = perf_counter()
+
+    class NoConversion:
+        __module__ = "numpy"
+        size = 480 * 270 * 3
+
+        def tolist(self):
+            pytest.fail("Oversized metadata must not be converted")
+
     with pytest.raises(ValueError, match=r"images.latest: total size exceeds"):
-        runtime.publish_image("latest", b"new", metadata={"frame": np.zeros((480, 270, 3))})
-    assert perf_counter() - started < 0.005
+        runtime.publish_image("latest", b"new", metadata={"frame": NoConversion()})
     assert runtime.image("latest")[0] == b"previous"
     assert runtime.status() == before
 
@@ -322,3 +328,43 @@ def test_image_metadata_coercion_outside_lock_and_detached():
     metadata["spectrum"][:] = 0
     assert runtime.status()["images"]["latest"]["spectrum"] == [1, 2]
     assert runtime.status()["images"]["latest"]["extra"] == "converted"
+
+
+@pytest.mark.parametrize("publisher", ["status", "image", "command"])
+def test_deep_publications_rejected_before_copy_or_conversion(publisher):
+    runtime = Runtime()
+    runtime.publish_status("camera", {"present": True})
+    runtime.publish_image("latest", b"previous")
+    previous = runtime.status()
+    nested = 0
+    for _ in range(500):
+        nested = [nested]
+    with pytest.raises(ValueError, match=r"nesting exceeds 32 levels"):
+        if publisher == "status":
+            runtime.publish_status("camera", {"deep": nested})
+        elif publisher == "image":
+            runtime.publish_image("latest", b"new", metadata={"deep": nested})
+        else:
+            runtime.register_command("test", "echo", lambda value: value)
+            runtime.enqueue_command({
+                "id": "deep", "target": "test", "name": "echo", "args": {"value": nested},
+            })
+    assert runtime.status() == previous
+    assert runtime.image("latest")[0] == b"previous"
+    assert runtime._commands.empty()
+    assert runtime.command_result("deep") is None
+
+
+def test_shared_depth_limit_boundary_and_cycles():
+    from visualz.state.json_safe import MAX_JSON_DEPTH
+
+    nested = 0
+    for _ in range(MAX_JSON_DEPTH):
+        nested = [nested]
+    coerce = JsonCoercer()
+    assert coerce(nested, max_elements=MAX_STATUS_ELEMENTS) == nested
+    with pytest.raises(ValueError, match="nesting exceeds"):
+        coerce([nested], max_elements=MAX_STATUS_ELEMENTS)
+    cycle = []
+    cycle.append(cycle)
+    coerce.check_size(cycle, "cycle", MAX_STATUS_ELEMENTS)

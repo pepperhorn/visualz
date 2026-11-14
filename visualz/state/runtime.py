@@ -35,6 +35,7 @@ low/high; null until T2 detects), requested_profile, resolution, hostname,
 ip_addresses, state_recovered. publish_image(name, bytes, content_type) publishes
 bounded in-memory snapshots at /api/stage/image/<name>; None removes one.
 Image metadata shares MAX_STATUS_ELEMENTS and is coerced outside the lock.
+All size-checked publications and command args also share MAX_JSON_DEPTH.
 """
 
 from copy import deepcopy
@@ -194,7 +195,6 @@ class Runtime:
             metadata = {} if metadata is None else metadata
             if not isinstance(metadata, dict):
                 raise ValueError("Image metadata must be an object")
-            self.coerce.check_size(metadata, key, MAX_STATUS_ELEMENTS)
             metadata = self.coerce(
                 {**metadata, "content_type": content_type, "bytes": len(content)},
                 key,
