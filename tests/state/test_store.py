@@ -416,7 +416,7 @@ def test_quarantined_overlay_replacement_survives_later_save(tmp_path, rename):
 
 
 @pytest.mark.parametrize("earlier_save", [False, True], ids=["first-save", "after-save"])
-def test_changed_overlay_is_not_deleted_by_flush(tmp_path, earlier_save):
+def test_changed_overlay_ui_delete_wins_and_preserves_conflict(tmp_path, earlier_save):
     import json
 
     seed = Store(tmp_path)
@@ -432,9 +432,367 @@ def test_changed_overlay_is_not_deleted_by_flush(tmp_path, earlier_save):
         path.write_bytes(content)
         store.transaction(lambda state: state["overlays"].pop("lower-third"))
         store.flush()
+        assert not path.exists()
+        conflict = path.with_name("lower-third.invalid.json")
+        assert conflict.read_bytes() == content
+        assert "conflicted" in conflict.with_suffix(".txt").read_text()
+        store.reload_documents()
+        store._pending.join()
+        assert "lower-third" not in store.get()["overlays"]
+    finally:
+        store.close()
+    restarted = Store(tmp_path)
+    try:
+        assert "lower-third" not in restarted.get()["overlays"]
+        assert not path.exists()
+        entry = restarted.runtime.status()["stage"]["rejected_overlays"][0]
+        assert entry["kind"] == "conflict" and entry["resolved"] is False
+    finally:
+        restarted.close()
+
+
+def test_rejections_capped_newest_and_publication_cannot_break_startup(tmp_path, monkeypatch):
+    import os
+    from visualz.state.runtime import Runtime
+
+    directory = tmp_path / "overlays"
+    directory.mkdir()
+    for index in range(1000):
+        path = directory / f"edit.invalid-{index}.json"
+        path.write_text("{}")
+        os.utime(path, ns=(index + 1, index + 1))
+    store = Store(tmp_path, debounce=100)
+    try:
+        status = store.runtime.status()["stage"]
+        assert status["rejected_overlays_total"] == 1000
+        files = status["rejected_overlays"]
+        assert len(files) == 50
+        assert files[0]["file"] == "edit.invalid-999.json"
+        assert files[-1]["file"] == "edit.invalid-950.json"
+        assert all(entry["resolved"] is False for entry in files)
+    finally:
+        store.close()
+
+    publish = Runtime.publish_status
+
+    def fail_rejections(self, target, values):
+        if any(key.startswith("rejected_") for key in values):
+            raise ValueError("status unavailable")
+        return publish(self, target, values)
+
+    monkeypatch.setattr(Runtime, "publish_status", fail_rejections)
+    store = Store(tmp_path)
+    store.close()
+
+
+def test_dismiss_rejected_pair_and_resolved_status(tmp_path, monkeypatch):
+    from threading import current_thread
+    from pathlib import Path
+
+    store = Store(tmp_path, debounce=100)
+    try:
+        store.flush()
+        directory = tmp_path / "overlays"
+        rejected = directory / "lower-third.invalid.json"
+        rejected.write_text("bad")
+        rejected.with_suffix(".txt").write_text("bad JSON")
+        other = directory / "title-card.invalid.json"
+        other.write_text("other")
+        other.with_suffix(".txt").write_text("keep")
+        store._refresh_rejections("overlays")
+        store._publish_rejections("overlays")
+        entries = store.runtime.status()["stage"]["rejected_overlays"]
+        assert all(entry["resolved"] for entry in entries)
+        unlink = Path.unlink
+
+        def worker_unlink(path, *args, **kwargs):
+            assert current_thread() is store._worker
+            return unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", worker_unlink)
+        store.runtime.enqueue_command(dict(
+            target="overlays", name="dismiss_rejected", id="dismiss",
+            args=dict(collection="overlays", file=rejected.name),
+        ))
+        store.runtime.drain_commands()
+        assert store.runtime.command_result("dismiss")["value"] == {"queued": True}
+        store._pending.join()
+        assert not rejected.exists() and not rejected.with_suffix(".txt").exists()
+        assert other.read_text() == "other" and other.with_suffix(".txt").read_text() == "keep"
+        assert (directory / "lower-third.json").exists()
+        assert store.runtime.status()["stage"]["rejected_overlays_total"] == 1
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("collection,file", [
+    ("overlays", "../x"), ("overlays", "/tmp/x.invalid.json"),
+    ("overlays", "lower-third.json"), ("overlays", "../scenes/x.invalid.json"),
+    ("overlays", "x\\invalid.json"), ("overlays", "x..invalid.json"),
+    ("assets", "x.invalid.json"), ("../scenes", "x.invalid.json"),
+])
+def test_dismiss_rejected_refuses_unsafe_names(tmp_path, collection, file):
+    store = Store(tmp_path, debounce=100)
+    try:
+        store.flush()
+        before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+        store.runtime.enqueue_command(dict(
+            target="overlays", name="dismiss_rejected", id="bad",
+            args=dict(collection=collection, file=file),
+        ))
+        store.runtime.drain_commands()
+        store._pending.join()
+        assert store.runtime.command_result("bad")["error"]
+        assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("first_save", [True, False])
+def test_valid_hand_edit_survives_different_overlay_save(tmp_path, first_save):
+    import json
+
+    seed = Store(tmp_path)
+    seed.close()
+    store = Store(tmp_path, debounce=100)
+    path = tmp_path / "overlays/lower-third.json"
+    try:
+        if not first_save:
+            store.flush()
+        edited = dict(store.get()["overlays"]["lower-third"], name="Hand edited")
+        content = json.dumps(edited).encode()
+        path.write_bytes(content)
+        store.patch({"overlays": {"title-card": {"name": "UI edit"}}})
+        store.flush()
         assert path.read_bytes() == content
+        assert store.get()["overlays"]["lower-third"] == edited
         store.reload_documents()
         store._pending.join()
         assert store.get()["overlays"]["lower-third"] == edited
     finally:
         store.close()
+    restarted = Store(tmp_path)
+    try:
+        assert restarted.get()["overlays"]["lower-third"] == edited
+    finally:
+        restarted.close()
+
+
+@pytest.mark.parametrize("first_save", [True, False])
+def test_same_overlay_conflict_keeps_ui_and_quarantines_hand_edit(tmp_path, first_save):
+    import json
+
+    seed = Store(tmp_path)
+    seed.close()
+    store = Store(tmp_path, debounce=100)
+    path = tmp_path / "overlays/lower-third.json"
+    try:
+        if not first_save:
+            store.flush()
+        edited = dict(store.get()["overlays"]["lower-third"], name="Hand edited")
+        content = json.dumps(edited).encode()
+        path.write_bytes(content)
+        store.patch({"overlays": {"lower-third": {"name": "UI edit"}}})
+        store.flush()
+        assert json.loads(path.read_bytes())["name"] == "UI edit"
+        rejected = path.with_name("lower-third.invalid.json")
+        assert rejected.read_bytes() == content
+        assert "conflicted" in rejected.with_suffix(".txt").read_text()
+        entry = store.runtime.status()["stage"]["rejected_overlays"][0]
+        assert entry["kind"] == "conflict" and entry["resolved"] is False
+        assert store.get()["overlays"]["lower-third"]["name"] == "UI edit"
+    finally:
+        store.close()
+
+
+def test_failed_reload_does_not_claim_hand_dropped_file(tmp_path, monkeypatch):
+    import json
+
+    store = Store(tmp_path, debounce=100)
+    try:
+        store.flush()
+        path = tmp_path / "overlays/lower-third.json"
+        edited = dict(store.get()["overlays"]["lower-third"], name="Failed reload edit")
+        content = json.dumps(edited).encode()
+        path.write_bytes(content)
+        validate = store._validate
+
+        def fail_transaction(state, previous=None):
+            if previous is store._data:
+                raise ValueError("Reload race: reference changed")
+            return validate(state, previous)
+
+        monkeypatch.setattr(store, "_validate", fail_transaction)
+        store.reload_documents()
+        store._pending.join()
+        assert "Reload race" in store.runtime.status()["state"]["error"]
+        monkeypatch.setattr(store, "_validate", validate)
+        # Drop the same bytes seen during the failed reload, then delete via UI.
+        path.unlink()
+        path.write_bytes(content)
+        store.transaction(lambda state: state["overlays"].pop("lower-third"))
+        store.flush()
+        assert not path.exists()
+        assert path.with_name("lower-third.invalid.json").read_bytes() == content
+    finally:
+        store.close()
+
+
+def test_reload_does_not_mark_unwritten_ui_document_as_saved(tmp_path):
+    import json
+
+    store = Store(tmp_path, debounce=100)
+    try:
+        store.flush()
+        added = dict(store.get()["overlays"]["lower-third"], id="new", name="New")
+        store.patch({"overlays": {"new": added}})
+        store.reload_documents()
+        store._pending.join()
+        store.flush()
+        assert json.loads((tmp_path / "overlays/new.json").read_text()) == added
+    finally:
+        store.close()
+
+
+def test_dismiss_does_not_delete_file_from_another_collection(tmp_path):
+    store = Store(tmp_path, debounce=100)
+    try:
+        directory = tmp_path / "scenes"
+        directory.mkdir()
+        rejected = directory / "only-here.invalid.json"
+        rejected.write_text("keep")
+        rejected.with_suffix(".txt").write_text("keep note")
+        store.dismiss_rejected("overlays", rejected.name)
+        store._pending.join()
+        assert store.runtime.status()["state"]["error"]
+        assert rejected.read_text() == "keep"
+        assert rejected.with_suffix(".txt").read_text() == "keep note"
+    finally:
+        store.close()
+
+
+def test_close_preserves_and_loads_valid_external_edit(tmp_path):
+    import json
+
+    seed = Store(tmp_path)
+    seed.close()
+    store = Store(tmp_path, debounce=100)
+    edited = dict(store.get()["overlays"]["lower-third"], name="Edited before close")
+    path = tmp_path / "overlays/lower-third.json"
+    content = json.dumps(edited).encode()
+    path.write_bytes(content)
+    store.close()
+    assert path.read_bytes() == content
+    assert store.get()["overlays"]["lower-third"] == edited
+
+
+def test_identical_ui_and_external_edit_has_no_conflict(tmp_path):
+    import json
+
+    store = Store(tmp_path, debounce=100)
+    try:
+        store.flush()
+        path = tmp_path / "overlays/lower-third.json"
+        edited = dict(store.get()["overlays"]["lower-third"], name="Same")
+        content = json.dumps(edited).encode()
+        path.write_bytes(content)
+        store.patch({"overlays": {"lower-third": {"name": "Same"}}})
+        store.flush()
+        assert path.read_bytes() == content
+        assert not list(path.parent.glob("*.invalid*.json"))
+        assert store._disk_documents[path] == edited
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("content", [b"null", b"[]", b"42", b'"text"', b"true"])
+def test_non_object_hand_drop_is_quarantined_never_deleted(tmp_path, content):
+    store = Store(tmp_path, debounce=100)
+    try:
+        store.flush()
+        path = tmp_path / "overlays/hand-drop.json"
+        path.write_bytes(content)
+        store.patch({"overlays": {"title-card": {"name": "Trigger save"}}})
+        store.flush()
+        assert not path.exists()
+        rejected = path.with_name("hand-drop.invalid.json")
+        assert rejected.read_bytes() == content
+        assert rejected.with_suffix(".txt").read_text()
+        entry = store.runtime.status()["stage"]["rejected_overlays"][0]
+        assert entry["kind"] == "invalid" and entry["resolved"] is False
+    finally:
+        store.close()
+
+
+def test_rejections_add_no_save_reads_or_validations(tmp_path, monkeypatch):
+    from pathlib import Path
+    import visualz.state as state_module
+
+    counts = []
+    for rejected_count in (0, 50):
+        directory = tmp_path / str(rejected_count)
+        seed = Store(directory, debounce=100)
+        overlay = seed.get()["overlays"]["lower-third"]
+        seed.patch({"overlays": {
+            f"extra-{index}": dict(overlay, id=f"extra-{index}") for index in range(27)
+        }})
+        seed.close()
+        for index in range(rejected_count):
+            path = directory / "overlays" / f"lower-third.invalid-{index}.json"
+            path.write_text("{}")
+            path.with_suffix(".txt").write_text("bad edit")
+        store = Store(directory, debounce=100)
+        try:
+            store.flush()
+            calls = dict(reads=0, state_validations=0, schema_validations=0, publications=0)
+            original_open = Path.open
+            original_validate = store._validate
+            original_schema = state_module.validate
+            original_publish = store.runtime.publish_status
+
+            def open_counted(path, mode="r", *args, **kwargs):
+                if "r" in mode:
+                    calls["reads"] += 1
+                return original_open(path, mode, *args, **kwargs)
+
+            def validate_counted(*args, **kwargs):
+                calls["state_validations"] += 1
+                return original_validate(*args, **kwargs)
+
+            def schema_counted(*args, **kwargs):
+                calls["schema_validations"] += 1
+                return original_schema(*args, **kwargs)
+
+            def publish_counted(target, values):
+                if any(key.startswith("rejected_") for key in values):
+                    calls["publications"] += 1
+                return original_publish(target, values)
+
+            with monkeypatch.context() as patch:
+                patch.setattr(Path, "open", open_counted)
+                patch.setattr(store, "_validate", validate_counted)
+                patch.setattr(state_module, "validate", schema_counted)
+                patch.setattr(store.runtime, "publish_status", publish_counted)
+                store.patch({"overlays": {"title-card": {"name": "Changed"}}})
+                store.flush()
+                counts.append(calls.copy())
+                assert calls["publications"] == 0  # rejection/resolution data is unchanged
+                store.patch({"now_playing": {"song": "Unrelated save"}})
+                store.flush()
+                assert calls["publications"] == 0
+            # Publication itself may use only cached facts, including resolved.
+            def forbidden(*args, **kwargs):
+                raise AssertionError("publication performed I/O or validation")
+
+            with monkeypatch.context() as patch:
+                patch.setattr(Path, "open", forbidden)
+                patch.setattr(store, "_validate", forbidden)
+                patch.setattr(state_module, "validate", forbidden)
+                store._published_rejections.pop("overlays")
+                store._publish_rejections("overlays")
+                assert "overlays" in store._published_rejections
+        finally:
+            store.close()
+    assert counts[0] == counts[1]
+    assert counts[1]["state_validations"] == 1
+    assert counts[1]["schema_validations"] == 1

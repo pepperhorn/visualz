@@ -50,5 +50,7 @@ None.
 ---
 ## Receiver ack
 
+I will cap rejection publication at the newest 50 with a total, add a worker-backed safe dismissal command and resolved flags, preserve valid external edits and quarantine conflicts, and commit disk ownership only after a successful reload transaction. I will change only the two assigned source/test files and my handoffs, run the required checks, then push a draft PR. No open questions. GBrain: unavailable.
+
 ---
 ## Return (implementer → lead; write a separate …--codex-to-lead.md)
