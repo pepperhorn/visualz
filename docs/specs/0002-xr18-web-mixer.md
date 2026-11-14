@@ -33,7 +33,7 @@ Options considered and declined by the human on 2026-11-14: streaming Behringer'
 - Strips for the 16 input channels, the aux input, the 4 FX returns, the 6 buses, and main LR. Each strip shows the name and colour set on the mixer, a fader, a mute button, and a level meter.
 - A mix selector switches what the faders control: the main LR mix, or the sends to any one bus ("sends on faders").
 - Phone portrait shows a scrollable row of strips with large touch targets; faders need a deliberate drag (a tap on the track does not jump the level).
-- Optional PIN: when set, the engineer page asks for it once per device. Musician pages never need it.
+- Engineer PIN: on by default, set to `0000` on a fresh install. The engineer page asks for it once per device and remembers it. It can be changed or turned off in the mixer settings. While it is still `0000`, the engineer page shows a reminder to change it. Musician pages never need it.
 
 ### Channel detail (engineer only)
 Tapping a strip's name opens that channel. Required by the human on 2026-11-14: sends, preamp gain, phantom power, EQ, and dynamics.
@@ -65,7 +65,7 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 - Mutes on the engineer page for main LR ask for confirmation when un-muting.
 - **Phantom power** asks for confirmation on every switch, on or off, and names the channel in the question.
 - **Preamp gain** moves in small steps per gesture (no jump from a stray tap) and shows the input meter beside it while adjusting.
-- Preamp, EQ, and dynamics are engineer-only. If an engineer PIN is set it covers them; musician pages can never reach them.
+- Preamp, EQ, and dynamics are engineer-only and sit behind the engineer PIN; musician pages can never reach them.
 - If two people move the same control, the last move wins and both pages show the result.
 
 ## Constraints
@@ -88,7 +88,7 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 - [ ] AC8 — QR codes on the engineer page open the right musician page.
 - [ ] AC21 — A stereo-linked bus pair on the (simulated) mixer appears as one in-ear mix with per-channel pan; unlinking it on the mixer turns it back into two mono mixes. Level rises on an in-ear mix are ramped. A wedge mix has no pan control.
 - [ ] AC9 — Musician profiles save, survive a restart, and reload.
-- [ ] AC10 — With a PIN set, the engineer page is refused without it and musician pages still work.
+- [ ] AC10 — A fresh install requires PIN `0000` for the engineer page and shows the change-it reminder; the PIN can be changed and turned off; the engineer page and its API are refused without the PIN while musician pages still work; repeated wrong PINs are slowed down.
 - [ ] AC11 — Rate limit and step limit are enforced by the server.
 - [ ] AC12 — Losing the mixer disables controls and shows the state; it reconnects by itself when the mixer returns.
 - [ ] AC13 — Stopping the visuals service leaves the mixer pages working.
@@ -101,6 +101,6 @@ Tapping a strip's name opens that channel. Required by the human on 2026-11-14: 
 - [ ] AC15 — (Human, real hardware) With the real XR18 on the venue router: discovery, faders, mutes, meters, a musician page, and channel detail (gain, phantom, sends, EQ, gate, compressor) all work, and stay in sync with X AIR Edit on another device.
 
 ## Open questions
-Answered 2026-11-14: monitors are a combination of wedges and in-ear feeds, so both mono and stereo-linked mixes are supported.
+Answered 2026-11-14: monitors are a combination of wedges and in-ear feeds, so both mono and stereo-linked mixes are supported. The engineer PIN is on by default, initially `0000`.
 
-1. **Is an engineer PIN wanted by default**, or off unless you turn it on? Assumed off. Now that gain and phantom power are controllable from the page, I recommend on.
+None.

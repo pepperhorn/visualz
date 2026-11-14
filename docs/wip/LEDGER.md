@@ -12,7 +12,7 @@ Next ID: 0003
 | K | Title | Status | Waiting on | Owner (provider/model) | Branch | PR | Worktree | T3 task/thread | Spec | Plan | Latest handoff | Updated |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | 0001 | Audio-reactive visuals for live shows (v1) | planned | human: approve spec 0001 (no open questions left) | — | — | — | — | — | [spec](../specs/0001-audio-reactive-visuals.md) | [plan](../plans/0001-audio-reactive-visuals.md) | — | 2026-11-14 |
-| 0002 | XR18 web mixer and personal monitor mixes | planned | human: approve spec 0002 and answer its 2 open questions; build starts after 0001 T1 and T4 | — | — | — | — | — | [spec](../specs/0002-xr18-web-mixer.md) | [plan](../plans/0002-xr18-web-mixer.md) | — | 2026-11-14 |
+| 0002 | XR18 web mixer and personal monitor mixes | planned | human: approve spec 0002 (no open questions left); build starts after 0001 T1 and T4 | — | — | — | — | — | [spec](../specs/0002-xr18-web-mixer.md) | [plan](../plans/0002-xr18-web-mixer.md) | — | 2026-11-14 |
 
 ## Done / closed
 
@@ -31,6 +31,7 @@ Last health scan: never
 
 ## Log
 <!-- One line per status change, newest first: YYYY-MM-DD NNNN old→new — note -->
+2026-11-14 0002 planned→planned — all open questions answered: wedges and in-ears, engineer PIN on by default (0000)
 2026-11-14 0002 planned→planned — scope grown at the human's request: per-channel sends, preamp gain, phantom power, EQ, gate, compressor (new task T3)
 2026-11-14 0002 —→planned — spec and plan drafted (built-in web mixer chosen over BandPilot and X AIR Edit remote desktop)
 2026-11-14 0001 planned→planned — MIT licence added; XR18 over USB is the audio source; all open questions answered
