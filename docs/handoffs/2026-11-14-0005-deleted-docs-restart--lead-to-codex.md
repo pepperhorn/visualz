@@ -30,7 +30,7 @@ xvfb-run -a .venv/bin/pytest -q   # if xvfb is available
 ```
 
 ## Known gotchas / decisions already made
-- The system `python3` on the build box is 3.14, and pygame has no wheel for it (the source build fails without SDL headers). Build the venv with Python 3.11: `uv venv --python 3.11 --seed .venv && .venv/bin/pip install -e '.[dev]'`.
+- The system `python3` on the build box is 3.14, and pygame has no wheel for it (the source build fails without SDL headers). Build the venv with Python 3.11: `python3.11 -m venv .venv && .venv/bin/pip install -e '.[dev]'`.
 - The target is Raspberry Pi OS Bookworm (Python 3.11). Keep to the standard library and the dependencies already in `pyproject.toml`.
 - GBrain: unavailable.
 
