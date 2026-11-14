@@ -54,10 +54,19 @@ class JsonCoercer:
         finally:
             seen.remove(id(value))
 
+    def check_size(self, value, key, max_elements):
+        """Reject oversized values and normalize failures from custom size accessors."""
+        try:
+            self._check_size(value, key, [max_elements, max_elements], set())
+        except ValueError:
+            raise
+        except Exception as exc:
+            raise ValueError(f"{key}: unable to check total size") from exc
+
     def __call__(self, value, key="status", _seen=None, *, max_elements=None):
         # Opt-in at publication only: defensive send-time coercion stays tolerant.
         if max_elements is not None:
-            self._check_size(value, key, [max_elements, max_elements], set())
+            self.check_size(value, key, max_elements)
         seen = set() if _seen is None else _seen
         if value is None or isinstance(value, (str, bool, int)):
             return value

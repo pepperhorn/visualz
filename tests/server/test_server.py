@@ -519,8 +519,10 @@ async def test_r2_3_5_command_ids_results_errors_and_overload(api):
     for _ in range(128):
         store.runtime.enqueue_command({"target": "test", "name": "value", "args": {}})
     overloaded = await client.post(
-        "/api/stage/command", json={"target": "test", "name": "value", "args": {}}
+        "/api/stage/command",
+        json={"target": "test", "name": "value", "args": {}, "id": "http-retry"},
     )
+    assert (await overloaded.json())["id"] == "http-retry"
     assert overloaded.status == 503 and overloaded.headers["Retry-After"] == "1"
     assert (
         await client.post(
@@ -556,3 +558,94 @@ async def test_r2_2_high_frame_count_archive_import_and_export(api):
     assert response.status == 200
     with ZipFile(BytesIO(await response.read())) as archive:
         assert len(archive.namelist()) == 302
+
+
+@pytest.mark.parametrize("count,accepted", [(5000, False), (300, True)])
+async def test_command_arg_bounds_http_and_websocket(api, count, accepted):
+    client, store = api
+    calls = []
+    store.runtime.register_command("test", "echo", lambda value: calls.append(value))
+    args = {"value": list(range(count))}
+    response = await client.post("/api/stage/command", json={
+        "id": "http-bound", "target": "test", "name": "echo", "args": args,
+    })
+    assert response.status == (202 if accepted else 400)
+    if not accepted:
+        assert "command.args: total size exceeds" in (await response.json())["error"]
+        assert store.runtime.command_result("http-bound") is None
+    ws = await client.ws_connect("/ws")
+    await next_state(ws)
+    await ws.send_json({
+        "type": "command", "id": "ws-bound", "target": "test", "name": "echo", "args": args,
+    })
+    reply = await receive_type(ws, "command" if accepted else "error")
+    assert reply["id"] == "ws-bound"
+    if not accepted:
+        assert "command.args: total size exceeds" in reply["error"]
+        assert store.runtime.command_result("ws-bound") is None
+        assert store.runtime._commands.empty()
+        assert (await receive_type(ws, "telemetry"))["type"] == "telemetry"
+    store.runtime.drain_commands(budget_ms=1000)
+    assert calls == ([args["value"], args["value"]] if accepted else [])
+    await ws.close()
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+async def test_command_body_limit_precedes_json_parse(api, monkeypatch, chunked):
+    from aiohttp import web
+    from visualz.server import MAX_COMMAND_BODY
+
+    client, store = api
+    store.runtime.register_command("test", "echo", lambda value: value)
+    payload = json.dumps({
+        "target": "test", "name": "echo", "args": {"value": "x" * (MAX_COMMAND_BODY * 4)},
+    }).encode()
+    parsed = []
+    original = web.Request.json
+
+    async def track_parse(request, **kwargs):
+        def loads(value):
+            parsed.append(value)
+            return json.loads(value)
+        return await original(request, loads=loads)
+
+    monkeypatch.setattr(web.Request, "json", track_parse)
+
+    release_body = asyncio.Event()
+
+    async def chunks():
+        # Hold back most of the body: rejection must arrive without reading it all.
+        yield payload[:MAX_COMMAND_BODY + 1]
+        await release_body.wait()
+        yield payload[MAX_COMMAND_BODY + 1:]
+
+    try:
+        response = await asyncio.wait_for(
+            client.post("/api/stage/command", data=chunks() if chunked else payload), 3
+        )
+    finally:
+        release_body.set()
+    assert response.status == 413
+    assert str(MAX_COMMAND_BODY) in await response.text()
+    assert not parsed
+    assert store.runtime._commands.empty()
+    # The command-specific limit must not constrain the larger upload/import routes.
+    from visualz.media import MAX_UPLOAD
+    assert client.server.app._client_max_size == MAX_UPLOAD > MAX_COMMAND_BODY
+
+
+async def test_bad_image_metadata_does_not_break_telemetry(api):
+    client, store = api
+
+    class BrokenSize:
+        def __len__(self):
+            raise RuntimeError("bad size")
+
+    store.runtime.publish_image("latest", b"previous")
+    with pytest.raises(ValueError):
+        store.runtime.publish_image("latest", b"new", metadata={"bad": BrokenSize()})
+    ws = await client.ws_connect("/ws")
+    assert (await receive_type(ws, "telemetry"))["images"]["latest"]["bytes"] == 8
+    assert (await client.get("/api/stage/status")).status == 200
+    assert store.runtime.image("latest")[0] == b"previous"
+    await ws.close()

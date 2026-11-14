@@ -138,13 +138,13 @@ def test_aggregate_error_names_target_instead_of_last_nested_field():
     assert str(raised.value) == f"audio: total size exceeds the {MAX_STATUS_ELEMENTS} element status limit"
 
 
-def test_oversized_command_args_and_result_do_not_interrupt_drain():
+def test_oversized_command_result_does_not_interrupt_drain():
     runtime = Runtime()
     values = list(range(MAX_STATUS_ELEMENTS + 1))
     callbacks = []
-    runtime.register_command("test", "echo", lambda value: value)
+    runtime.register_command("test", "echo", lambda value: values if value == "large" else value)
     runtime.enqueue_command(
-        {"id": "large", "target": "test", "name": "echo", "args": {"value": values}},
+        {"id": "large", "target": "test", "name": "echo", "args": {"value": "large"}},
         callbacks.append,
     )
     # Drain one first so its bounded summary can be inspected.
@@ -156,7 +156,7 @@ def test_oversized_command_args_and_result_do_not_interrupt_drain():
     assert callbacks[0]["value"] == values
     assert runtime.command_result("large")["value"] == values
     callbacks.clear()
-    for command_id, value in (("large-again", values), ("next", "ok")):
+    for command_id, value in (("large-again", "large"), ("next", "ok")):
         runtime.enqueue_command(
             {"id": command_id, "target": "test", "name": "echo", "args": {"value": value}},
             callbacks.append,
@@ -245,3 +245,80 @@ def test_status_deepcopy_outside_lock_preserves_snapshot_during_updates(monkeypa
     assert runtime.status() == {"audio": {"levels": [3]}, "images": {}}
     before["audio"]["levels"].append(99)
     assert runtime.status()["audio"]["levels"] == [3]
+
+
+@pytest.mark.parametrize("publisher", ["status", "image"])
+@pytest.mark.parametrize("error", [RuntimeError, TypeError, OverflowError, ValueError])
+def test_broken_size_accessor_is_value_error_and_preserves_publication(publisher, error):
+    runtime = Runtime()
+
+    class BrokenSize:
+        def __len__(self):
+            raise error("broken size")
+
+    runtime.publish_image("latest", b"previous", metadata={"sequence": 1})
+    before = runtime.status()
+    with pytest.raises(ValueError):
+        if publisher == "status":
+            runtime.publish_status("camera", {"bad": BrokenSize()})
+        else:
+            runtime.publish_image("latest", b"new", metadata={"bad": BrokenSize()})
+    assert runtime.status() == before
+    assert runtime.image("latest")[0] == b"previous"
+    assert JsonCoercer()(BrokenSize())  # Defensive telemetry coercion remains tolerant.
+
+
+def test_oversized_command_rejected_before_copy_or_queue():
+    runtime = Runtime()
+
+    class NoCopy(list):
+        def __deepcopy__(self, memo):
+            pytest.fail("Oversized args must not be copied")
+
+    runtime.register_command("test", "echo", lambda value: value)
+    with pytest.raises(ValueError, match=r"command.args: total size exceeds"):
+        runtime.enqueue_command({
+            "id": "oversized", "target": "test", "name": "echo",
+            "args": {"value": NoCopy(range(5000))},
+        })
+    assert runtime._commands.empty()
+    assert runtime.command_result("oversized") is None
+
+
+def test_oversized_image_metadata_rejected_quickly_and_atomically():
+    runtime = Runtime()
+    runtime.publish_image("latest", b"previous", metadata={"sequence": 1})
+    before = runtime.status()
+    started = perf_counter()
+    with pytest.raises(ValueError, match=r"images.latest: total size exceeds"):
+        runtime.publish_image("latest", b"new", metadata={"frame": np.zeros((480, 270, 3))})
+    assert perf_counter() - started < 0.005
+    assert runtime.image("latest")[0] == b"previous"
+    assert runtime.status() == before
+
+
+def test_image_metadata_coercion_outside_lock_and_detached():
+    runtime = Runtime()
+    converting, release = Event(), Event()
+
+    class BlockingString:
+        def __str__(self):
+            converting.set()
+            assert release.wait(3)
+            return "converted"
+
+    runtime.publish_image("latest", b"previous")
+    metadata = {"extra": BlockingString(), "spectrum": np.array([1, 2])}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        publish = pool.submit(runtime.publish_image, "latest", b"new", "image/png", metadata)
+        try:
+            assert converting.wait(1)
+            assert pool.submit(runtime.image, "latest").result(timeout=1)[0] == b"previous"
+            pool.submit(runtime.publish_status, "stage", {"fps": 30}).result(timeout=1)
+            assert pool.submit(runtime.status).result(timeout=1)["stage"]["fps"] == 30
+        finally:
+            release.set()
+        publish.result(timeout=1)
+    metadata["spectrum"][:] = 0
+    assert runtime.status()["images"]["latest"]["spectrum"] == [1, 2]
+    assert runtime.status()["images"]["latest"]["extra"] == "converted"

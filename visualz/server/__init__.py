@@ -38,8 +38,14 @@ from visualz.state import COLLECTIONS, merge
 from visualz.state.runtime import CommandQueueFull
 
 
+MAX_COMMAND_BODY = 64 * 1024
+
+
 @web.middleware
 async def errors(request, handler):
+    if request.method == "POST" and request.path == "/api/stage/command":
+        # Share the bounded request/cache with both the handler and error replies.
+        request = request.clone(client_max_size=MAX_COMMAND_BODY)
     try:
         return await handler(request)
     except CommandQueueFull as exc:
