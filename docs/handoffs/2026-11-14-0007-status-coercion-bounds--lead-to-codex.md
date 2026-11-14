@@ -7,7 +7,7 @@
 - **PR:** —
 - **Base commit:** 108ff559be065b8e77b3da644569fd3465f44c17
 - **Port (if running a server):** 5270
-- **Status:** open
+- **Status:** closed
 
 ## Goal
 Review finding F4. `publish_status` coerces values to JSON-safe form while holding the runtime lock (`visualz/state/runtime.py` about line 220). A mistaken `publish_status('camera', {'frame': ndarray(480,270,3)})` held the lock for 492 ms, which stalls the main thread's `drain_commands` and `status()`. Fix: coerce before taking the lock, and reject oversized values with a clear `ValueError` raised to the publisher: any array or sequence over 4096 elements in total. A 2048-bin spectrum must still be accepted. The defensive send-time coercion and the telemetry supervisor must keep working as they do now.
