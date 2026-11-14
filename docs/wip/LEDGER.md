@@ -11,7 +11,7 @@ Next ID: 0003
 
 | K | Title | Status | Waiting on | Owner (provider/model) | Branch | PR | Worktree | T3 task/thread | Spec | Plan | Latest handoff | Updated |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 0001 | Audio-reactive visuals for live shows (v1) | dispatched | lead: delegate T1 | T1: codex/gpt-6.1-sol | T1: orch/0001-t1-scaffold | — | — | — | [spec](../specs/0001-audio-reactive-visuals.md) | [plan](../plans/0001-audio-reactive-visuals.md) | [T1 dispatch](../handoffs/2026-11-14-0001-t1-scaffold--lead-to-codex.md) | 2026-11-14 |
+| 0001 | Audio-reactive visuals for live shows (v1) | dispatched | child node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1 | T1: codex/gpt-6.1-sol | T1: orch/0001-t1-scaffold | — | — | T1 task `node:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1` · thread `thread:delegated-task:command%3Amcp%3A25bc09b8-d5f3-4e82-b258-7f74ee95d4b5%3Adelegate-task%3A0001-t1-impl-r1` | [spec](../specs/0001-audio-reactive-visuals.md) | [plan](../plans/0001-audio-reactive-visuals.md) | [T1 dispatch](../handoffs/2026-11-14-0001-t1-scaffold--lead-to-codex.md) | 2026-11-14 |
 | 0002 | XR18 web mixer and personal monitor mixes | planned | human: approve spec 0002 (no open questions left); build starts after 0001 T1 and T4 | — | — | — | — | — | [spec](../specs/0002-xr18-web-mixer.md) | [plan](../plans/0002-xr18-web-mixer.md) | — | 2026-11-14 |
 
 ## Done / closed
@@ -31,6 +31,7 @@ Last health scan: never
 
 ## Log
 <!-- One line per status change, newest first: YYYY-MM-DD NNNN old→new — note -->
+2026-11-14 0001 dispatched — T1 delegated to codex/gpt-6.1-sol (0001-t1-impl-r1)
 2026-11-14 0001 planned→dispatched — spec approved by the human; T1 handoff written; T2–T5 wait on T1 merge and the Pi smoke test. GBrain: pending write-back (unavailable)
 2026-11-14 0002 planned→planned — all open questions answered: wedges and in-ears, engineer PIN on by default (0000)
 2026-11-14 0002 planned→planned — scope grown at the human's request: per-channel sends, preamp gain, phantom power, EQ, gate, compressor (new task T3)
